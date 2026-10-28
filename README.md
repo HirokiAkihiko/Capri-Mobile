@@ -26,7 +26,7 @@ Her brain runs on the phone itself: no servers, no account, no tracking.
 
 | 1. Install | 2. Summon | 3. Give her a brain |
 |---|---|---|
-| Download the APK from **[Releases](https://github.com/Capri-cmd/Capri-Mobile/releases/latest)** and open it. Allow installing unknown apps if your phone asks. | Open Capri, tap **Allow** (draw over other apps), then **Summon**. She's on your screen. | In the **Brain** tab, download one. Start with *Qwen3.5 0.8B*, try a *CapriAI2* one later. It downloads once and works offline. |
+| Download the APK from **[Releases](https://github.com/Capri-cmd/Capri-Mobile/releases/latest)** and open it. Allow installing unknown apps if your phone asks. | Open Capri, tap **Allow** (draw over other apps), then **Summon**. She's on your screen. | In the **Brain** tab, download one. *MiniCPM5 2B* runs on most phones; the bigger ones are smarter. It downloads once and works offline. |
 
 Optional, in **Setup**: allow the mic to talk to her, and turn on Accessibility so she can sit on icons and react to what you're scrolling.
 
@@ -54,16 +54,14 @@ Optional, in **Setup**: allow the mic to talk to her, and turn on Accessibility 
 
 ## Brains
 
-Pick one in the app. Bigger is smarter but needs more RAM.
+Pick one in the app. All of them are trained to be Capri. Bigger is smarter but needs more RAM.
 
 | Brain | Size | Phone RAM | |
 |---|---|---|---|
-| Qwen3.5 0.8B | 0.5 GB | 3 GB+ | tiny and quick |
-| Qwen3.5 2B | 1.3 GB | 4 GB+ | smarter, still light |
-| **CapriAI2 MiniCPM5 2B** | 1.6 GB | 4 GB+ | trained to be Capri |
-| **CapriAI2 Qwen3.5 4B** | 3.6 GB | 8 GB+ | trained to be Capri |
-| **CapriAI2 Gemma 4 E4B** | 5.3 GB | 12 GB+ | trained to be Capri |
-| **Nemotron Heretic E4B** | 5.3 GB | 12 GB+ | the closest to Capri |
+| **CapriAI2 MiniCPM5 2B** | 1.6 GB | 4 GB+ | light, runs on most phones |
+| **CapriAI2 Qwen3.5 4B** | 3.6 GB | 8 GB+ | smarter, can see |
+| **CapriAI2 Gemma 4 E4B** | 5.3 GB | 12 GB+ | flagship phones, can see |
+| **Nemotron Heretic E4B** | 5.3 GB | 12 GB+ | the closest to Capri, can see |
 
 **Eyes:** every brain except MiniCPM5 has an optional vision add-on (0.2 to 1 GB) so she can see your screen (Android 11+).
 Have your own model? **Add your own .gguf** in the Brain tab.
@@ -82,7 +80,7 @@ Have your own model? **Add your own .gguf** in the Brain tab.
 
 - **Accessibility switch is greyed out (Android 13+).** Go to *App info → ⋮ → Allow restricted settings*, then turn it on again.
 - **She disappears after a while.** Some phones (Xiaomi, Samsung, Huawei...) kill background apps. Set Capri's battery usage to *Unrestricted*.
-- **Her replies are slow.** Use a smaller brain. The 0.8B one runs on almost anything.
+- **Her replies are slow.** Use a smaller brain. MiniCPM5 2B is the lightest.
 - **What Accessibility is used for.** Finding icons to sit on, seeing which app is open and, with *Scroll with me* on, reading a feed's text for a reaction. Nothing is saved or sent.
 
 </details>
@@ -117,7 +115,7 @@ app/src/main/java/com/capri/mobile/
 - **Sprite art** by [Lachy](https://github.com/lachydotmcg), [PolyForm Noncommercial 1.0.0](app/src/main/assets/LICENSE.md). The app icon and her nap are cut from it.
 - **CapriAI2 models** trained by **[ghasty3](https://github.com/ghasty3)** ([Hugging Face](https://huggingface.co/Ghasty3/CapriAI2)). She's the reason Capri sounds like Capri.
 - **llama.cpp** by [ggml-org](https://github.com/ggml-org/llama.cpp), MIT.
-- **Models** keep their own licenses (Qwen: Apache 2.0, MiniCPM, Gemma, NVIDIA Nemotron).
+- **Base models** keep their own licenses (Qwen: Apache 2.0, MiniCPM, Gemma, NVIDIA Nemotron).
 - **Fonts:** Manrope, Fraunces and Share Tech Mono, [SIL Open Font License](NOTICE.md).
 
 ## Legal

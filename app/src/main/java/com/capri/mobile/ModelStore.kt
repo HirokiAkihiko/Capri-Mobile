@@ -4,7 +4,8 @@ import android.content.Context
 import java.io.File
 
 /**
- * Brains she can run on the phone (llama.cpp GGUFs), smallest first, plus any .gguf you add yourself.
+ * Brains she can run on the phone (llama.cpp GGUFs): only the ones trained to be Capri, smallest first, plus any .gguf
+ * you add yourself. A brain dropped from this list in an update stays usable: its file shows up as one of your own.
  * Everything lives in the app's own storage: models/<file>. App updates keep them (and a download only becomes
  * <file> once it's complete, so any <file> there is a finished brain, even if a newer catalog lists another size).
  * Uninstalling asks whether to keep the app's data (hasFragileUserData).
@@ -19,14 +20,6 @@ data class Model(val id: String, val label: String, val note: String, val url: S
 object ModelStore {
     private const val HF = "https://huggingface.co/"
     val catalog = listOf(
-        Model("qwen08", "Qwen3.5 0.8B", "tiny and quick, any phone", HF + "unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
-            "Qwen3.5-0.8B-Q4_K_M.gguf", 532517120, 3,
-            eyesUrl = HF + "unsloth/Qwen3.5-0.8B-GGUF/resolve/main/mmproj-F16.gguf", eyesFile = "Qwen3.5-0.8B-mmproj-F16.gguf",
-            eyesBytes = 204987232),
-        Model("qwen2b", "Qwen3.5 2B", "smarter, still light", HF + "unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf",
-            "Qwen3.5-2B-Q4_K_M.gguf", 1280835840, 4,
-            eyesUrl = HF + "unsloth/Qwen3.5-2B-GGUF/resolve/main/mmproj-F16.gguf", eyesFile = "Qwen3.5-2B-mmproj-F16.gguf",
-            eyesBytes = 668227264),
         Model("minicpm", "CapriAI2 MiniCPM5 2B", "trained to be Capri, light",
             HF + "Ghasty3/CapriAI2/resolve/main/minicpm5-2b/CapriAI2-MiniCPM5-2B.Q4_K_M.gguf",
             "CapriAI2-MiniCPM5-2B.Q4_K_M.gguf", 1561314688, 4, capri = true),
