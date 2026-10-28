@@ -1090,12 +1090,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         if (!prefs.talk && !asked) return
         talkOverChip = mode == Mode.CHIP
         talkText = text
-        bubble.dark = when (prefs.bubbleTheme) {
-            1 -> false
-            2 -> true
-            else -> (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES  // follow the phone
-        }
+        bubble.style = prefs.bubbleStyle
         val (w, h) = bubble.set(text, you, keep = live)
         bubbleLp.width = w
         bubbleLp.height = h

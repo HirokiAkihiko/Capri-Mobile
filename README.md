@@ -1,75 +1,96 @@
 <div align="center">
 
-# CAPRI // MOBILE
+<img src="docs/banner.png" alt="Capri, on your phone" width="100%">
 
-**Capri from *Cyberpunk: Edgerunners 2*, living on your phone.**
-She floats over your apps, sits on your icons, scrolls TikTok with you, and talks back with a brain that runs *on your phone*. No servers, no account.
+<br>
 
-![Android](https://img.shields.io/badge/Android-7.0%2B-2BFF9A?style=for-the-badge&logo=android&logoColor=black)
-![Offline AI](https://img.shields.io/badge/brain-100%25_on--device-FF1460?style=for-the-badge)
-![llama.cpp](https://img.shields.io/badge/llama.cpp-b11932-78FAFF?style=for-the-badge)
-![Fan made](https://img.shields.io/badge/fan--made-not_for_sale-F2EEF7?style=for-the-badge)
+<a href="https://github.com/Capri-cmd/Capri-Mobile"><img src="docs/badge.svg" alt="#1 Capri on your phone" width="250" height="55"></a>
 
-**[⬇ Download the APK](https://github.com/Capri-cmd/Capri-Mobile/releases/latest)** &nbsp;·&nbsp; the first Capri on a phone, ever
+<br><br>
 
-<img src="docs/onscreen.png" width="230" alt="Capri on the home screen"> <img src="docs/home.png" width="230" alt="The app"> <img src="docs/stash.png" width="230" alt="Achievements">
+[![Download](https://img.shields.io/badge/Download-APK-111111?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Capri-cmd/Capri-Mobile/releases/latest)
+&nbsp;
+![Android 7+](https://img.shields.io/badge/Android-7.0%2B-f4f3f5?style=for-the-badge)
+![Offline](https://img.shields.io/badge/brain-100%25_on_device-e2558a?style=for-the-badge)
+![Fan made](https://img.shields.io/badge/fan--made-not_for_sale-f4f3f5?style=for-the-badge)
+
+**Capri from *Cyberpunk: Edgerunners 2* lives on your phone.**<br>
+She floats over your apps, sits on your icons, scrolls with you and talks back.<br>
+Her brain runs on the phone itself: no servers, no account, no tracking.
 
 </div>
 
----
+<br>
+
+## Get her in 1 minute
+
+| 1. Install | 2. Summon | 3. Give her a brain |
+|---|---|---|
+| Download the APK from **[Releases](https://github.com/Capri-cmd/Capri-Mobile/releases/latest)** and open it. Allow installing unknown apps if your phone asks. | Open Capri, tap **Allow** (draw over other apps), then **Summon**. She's on your screen. | In the **Brain** tab, download one. Start with *Qwen3.5 0.8B*, try a *CapriAI2* one later. It downloads once and works offline. |
+
+Optional, in **Setup**: allow the mic to talk to her, and turn on Accessibility so she can sit on icons and react to what you're scrolling.
+
+<br>
+
+<div align="center"><img src="docs/screens.png" alt="Home, Brain and Stash screens" width="100%"></div>
 
 ## What she does
 
-| | |
-|---|---|
-| **Lives on your screen** | Floats over every app. Idles, blinks, glitches, zaps across the screen by breaking into her own pixels. |
-| **Poke her** | Head: annoyed. Body: a hop. Double tap: a grin. Five quick pokes and she storms off. |
-| **Throw her** | Grab, fling, watch her bounce. Throw her into the edge of the screen and she hides there, peeking. |
-| **Shake & tilt** | Shake your phone and she gets dizzy. Tilt it and she slides. Both can be switched off. |
-| **Sits on your apps** | Perches on app icons and buttons, falls off when they move. Throw her onto one. |
-| **Sees your screen** | Ask "look at this" / "what am I watching?" and she takes a look. Give her brain its **Eyes** (a small extra download) and she actually sees the screen; without them she reads its words. |
-| **Remembers your life** | Talk to her or show her something (a Discord DM, a profile) and she writes down what matters: who people are, their usernames, what they like, plans, birthdays. She brings it up later, and sometimes trolls you with it. Every memory is listed in the app: read it, delete it, or switch memory off. It never leaves your phone. |
-| **Talks back** | Hold her and talk. Her brain is an LLM running on your phone with llama.cpp. Pick one in the app, it downloads once and works offline. |
-| **Scroll with me** | In TikTok, Reels, Shorts, Reddit and X she reads the caption and comments and, every now and then, drops a reaction. Like a friend doomscrolling next to you. |
-| **Notices things** | Your charger, low battery, late nights, the app you open, unlocking your phone in the morning. |
-| **Hides when it matters** | Fullscreen videos and games: she steps away and comes back after. |
-| **Gifts & achievements** | She drops gifts now and then (from Eddies to a Relic fragment). 19 badges to unlock. Not into it? Switch the Game off in Setup. |
-| **Naps** | Hold her (no brain) or say "go to sleep": she curls up in a corner. Tap to wake her. |
+- **Lives on your screen.** She idles, blinks, glitches and zaps across the screen by breaking into her own pixels.
+- **Reacts to you.** Poke her head, her body, double tap her. Five quick pokes and she storms off.
+- **Throw her around.** Fling her and she bounces. Throw her into the edge and she hides there, peeking. Shake the phone and she gets dizzy; tilt it and she slides.
+- **Sits on your apps.** She perches on icons and buttons, and falls off when they move.
+- **Talks back.** Hold her and talk. Her brain is a real AI model running on your phone.
+- **Sees your screen.** Ask *"look at this"* and she takes a look (with the optional **Eyes** add-on).
+- **Remembers your life.** Names, usernames, birthdays, what people like. She brings it up later, and sometimes trolls you with it. You can read and delete every memory.
+- **Scrolls with you.** In TikTok, Reels, Shorts, Reddit and X she reads the caption and sometimes drops a reaction.
+- **Notices things.** Your charger, low battery, late nights, the app you open.
+- **Gets out of the way.** Fullscreen videos and games: she steps away and comes back after.
+- **Gifts and achievements.** She drops gifts now and then, and there are 19 badges to find. Not your thing? Switch **Game** off.
 
-## Install
+<div align="center"><img src="docs/moves.png" alt="Her poses" width="100%"></div>
 
-1. Grab `Capri.apk` from **[Releases](https://github.com/Capri-cmd/Capri-Mobile/releases/latest)** and open it on your phone (allow installing unknown apps).
-2. Open Capri, **Allow** drawing over other apps, then **Summon Capri**.
-3. **BRAIN** tab: download a brain. Start with *Qwen3.5 0.8B* to try it, then a CapriAI2 one.
-4. **SETUP** tab: allow the mic (talking) and switch on Accessibility (sitting on icons, app reactions, Scroll with me).
-   On Android 13+ the accessibility switch is greyed out for downloaded apps: **App info → ⋮ → Allow restricted settings**, then try again.
-
-Works on Android 7.0+, 64-bit phones (arm64). Some phones (Xiaomi, Samsung, Huawei...) kill background apps: set Capri's battery usage to *Unrestricted* so she stays.
+<div align="center"><img src="docs/bubbles.png" alt="Chat bubble styles" width="100%"></div>
 
 ## Brains
 
-Downloaded inside the app, smallest first. All run on the phone's CPU.
+Pick one in the app. Bigger is smarter but needs more RAM.
 
-| Brain | Size | Phone RAM | Notes |
+| Brain | Size | Phone RAM | |
 |---|---|---|---|
-| Qwen3.5 0.8B | 0.53 GB | 3 GB+ | tiny and quick |
-| Qwen3.5 2B | 1.28 GB | 4 GB+ | smarter, still light |
-| **CapriAI2 MiniCPM5 2B** | 1.56 GB | 4 GB+ | trained to be Capri |
-| **CapriAI2 Qwen3.5 4B** | 3.56 GB | 8 GB+ | trained to be Capri |
-| **CapriAI2 Gemma 4 E4B** | 5.34 GB | 12 GB+ | trained to be Capri |
-| **Nemotron Heretic E4B** | 5.34 GB | 12 GB+ | closest to Capri |
+| Qwen3.5 0.8B | 0.5 GB | 3 GB+ | tiny and quick |
+| Qwen3.5 2B | 1.3 GB | 4 GB+ | smarter, still light |
+| **CapriAI2 MiniCPM5 2B** | 1.6 GB | 4 GB+ | trained to be Capri |
+| **CapriAI2 Qwen3.5 4B** | 3.6 GB | 8 GB+ | trained to be Capri |
+| **CapriAI2 Gemma 4 E4B** | 5.3 GB | 12 GB+ | trained to be Capri |
+| **Nemotron Heretic E4B** | 5.3 GB | 12 GB+ | the closest to Capri |
 
-**Eyes**: every brain except MiniCPM5 has an optional vision add-on (0.2–1 GB) that lets her look at your screen (Android 11+).
+**Eyes:** every brain except MiniCPM5 has an optional vision add-on (0.2 to 1 GB) so she can see your screen (Android 11+).
+Have your own model? **Add your own .gguf** in the Brain tab.
 
-Got your own? **Add your own .gguf** in the BRAIN tab: anything this llama.cpp version runs works.
-The CapriAI2 models were trained by **[ghasty3](https://github.com/ghasty3)** ([Hugging Face](https://huggingface.co/Ghasty3/CapriAI2)): she's the reason Capri sounds like Capri.
+## Your stuff is safe
 
-## Privacy
+- **Updates keep everything.** Install a new version over the old one and her brains, memories, your name, badges and settings are all still there. Nothing downloads again.
+- **Uninstalling asks first.** Android asks if you want to keep her data, so a reinstall picks up where you left off.
+- **Backups.** Her memory, your name and settings ride along with your phone's backup. Brains are too big for that, so they download again on a new phone.
+- **Nothing leaves your phone.** No accounts, no analytics, no servers of ours. The only internet traffic is downloading the brains you pick from Hugging Face.
 
-Everything happens on your phone. No accounts, no analytics, no servers of ours. Her memories live in the app's private storage and you can read, delete or wipe them any time. The only network traffic is downloading the brains you pick (from Hugging Face).
-Accessibility is optional and only used to find icons to sit on, see which app is open and, with *Scroll with me* on, read a feed's text for a reaction. Nothing is saved or sent. Speech goes through your phone's own speech recognizer.
+<details>
+<summary><b>Help: something isn't working</b></summary>
 
-## Build from source
+<br>
+
+- **Accessibility switch is greyed out (Android 13+).** Go to *App info → ⋮ → Allow restricted settings*, then turn it on again.
+- **She disappears after a while.** Some phones (Xiaomi, Samsung, Huawei...) kill background apps. Set Capri's battery usage to *Unrestricted*.
+- **Her replies are slow.** Use a smaller brain. The 0.8B one runs on almost anything.
+- **What Accessibility is used for.** Finding icons to sit on, seeing which app is open and, with *Scroll with me* on, reading a feed's text for a reaction. Nothing is saved or sent.
+
+</details>
+
+<details>
+<summary><b>Build it yourself</b></summary>
+
+<br>
 
 Android Studio (2026.x), **NDK 28.2.13676358**, **CMake 3.22.1**.
 
@@ -77,7 +98,7 @@ Android Studio (2026.x), **NDK 28.2.13676358**, **CMake 3.22.1**.
 git clone https://github.com/Capri-cmd/Capri-Mobile.git
 ```
 
-llama.cpp lives in `third_party/llama.cpp`: the parts the app needs from tag **b11932** (the same build as the desktop Capri), MIT licensed. It's compiled into `libcapri_llama.so` by `app/src/main/cpp/CMakeLists.txt`, with a small JNI bridge in `capri_llama.cpp`. Open the project, let Gradle sync, and run. The APK also carries an x86_64 build, so it runs on the emulator.
+llama.cpp lives in `third_party/llama.cpp` (tag **b11932**, MIT). It's compiled into `libcapri_llama.so` by `app/src/main/cpp/CMakeLists.txt`, with a small JNI bridge in `capri_llama.cpp`. Open the project, let Gradle sync, and run. The APK also carries an x86_64 build for the emulator.
 
 ```
 app/src/main/java/com/capri/mobile/
@@ -89,23 +110,22 @@ app/src/main/java/com/capri/mobile/
   MainActivity.kt   the app (Home / Brain / Stash / Setup / About)
 ```
 
-## Credits & legal
+</details>
 
-**Capri is an unofficial, non-commercial fan project.** It is not made, endorsed or sponsored by CD PROJEKT RED, Studio Trigger or R. Talsorian Games, and it's not for sale.
+## Credits
 
-- **Capri, Cyberpunk: Edgerunners, Cyberpunk 2077** are trademarks and characters of CD PROJEKT S.A. *Cyberpunk* is a trademark of R. Talsorian Games. All rights to them stay with their owners.
-- **Sprite art** by [Lachy](https://github.com/lachydotmcg), [PolyForm Noncommercial 1.0.0](app/src/main/assets/LICENSE.md). The app icon and her nap are cut from it: **no official art, audio, logos or video** ship with this app.
-- **Model training**: the CapriAI2 models (MiniCPM5 2B, Qwen3.5 4B, Gemma 4 E4B, Nemotron E4B) by [ghasty3](https://github.com/ghasty3).
+- **Sprite art** by [Lachy](https://github.com/lachydotmcg), [PolyForm Noncommercial 1.0.0](app/src/main/assets/LICENSE.md). The app icon and her nap are cut from it.
+- **CapriAI2 models** trained by **[ghasty3](https://github.com/ghasty3)** ([Hugging Face](https://huggingface.co/Ghasty3/CapriAI2)). She's the reason Capri sounds like Capri.
 - **llama.cpp** by [ggml-org](https://github.com/ggml-org/llama.cpp), MIT.
-- **Models** each keep their own license (Qwen: Apache 2.0, MiniCPM, Gemma, NVIDIA Nemotron): see their Hugging Face pages.
-- **Share Tech Mono** font by Carrois Apostrophe, [SIL Open Font License](app/src/main/assets/OFL-ShareTechMono.txt).
+- **Models** keep their own licenses (Qwen: Apache 2.0, MiniCPM, Gemma, NVIDIA Nemotron).
+- **Fonts:** Manrope, Fraunces and Share Tech Mono, [SIL Open Font License](NOTICE.md).
 
-**License:** the app's code is under the [PolyForm Noncommercial License 1.0.0](LICENSE): free to use, change and share, never for sale. Third-party pieces and their licenses: [NOTICE.md](NOTICE.md).
+## Legal
+
+**Capri Mobile is an unofficial, non-commercial fan project.** It is not made, endorsed or sponsored by CD PROJEKT RED, Studio Trigger or R. Talsorian Games, and it's not for sale. Capri, Cyberpunk: Edgerunners and Cyberpunk 2077 are trademarks and characters of CD PROJEKT S.A.; *Cyberpunk* is a trademark of R. Talsorian Games. All rights stay with their owners. **No official art, audio, logos or video** ship with this app.
+
+The app's code is under the [PolyForm Noncommercial License 1.0.0](LICENSE): free to use, change and share, never for sale. Third-party pieces: [NOTICE.md](NOTICE.md).
 
 If you're a rights holder and want something changed or taken down, [open an issue](https://github.com/Capri-cmd/Capri-Mobile/issues) and it will be handled right away.
 
-<div align="center">
-
-*made by the Capri crew // choom approved*
-
-</div>
+<div align="center"><br><sub>made by the Capri crew · choom approved</sub></div>

@@ -5,7 +5,9 @@ import java.io.File
 
 /**
  * Brains she can run on the phone (llama.cpp GGUFs), smallest first, plus any .gguf you add yourself.
- * Everything lives in the app's own storage: models/<file>. Uninstalling the app removes them.
+ * Everything lives in the app's own storage: models/<file>. App updates keep them (and a download only becomes
+ * <file> once it's complete, so any <file> there is a finished brain, even if a newer catalog lists another size).
+ * Uninstalling asks whether to keep the app's data (hasFragileUserData).
  */
 data class Model(val id: String, val label: String, val note: String, val url: String, val file: String, val bytes: Long,
                  val minRamGb: Int, val capri: Boolean = false,
@@ -48,10 +50,10 @@ object ModelStore {
     fun dir(c: Context) = File(c.filesDir, "models").apply { mkdirs() }
     fun file(c: Context, m: Model) = File(dir(c), m.file)
     fun part(c: Context, m: Model) = File(dir(c), m.file + ".part")
-    fun installed(c: Context, m: Model) = file(c, m).let { it.exists() && it.length() == m.bytes }
+    fun installed(c: Context, m: Model) = file(c, m).let { it.exists() && it.length() > 0 }
 
     fun eyes(c: Context, m: Model) = File(dir(c), m.eyesFile)
-    fun eyesInstalled(c: Context, m: Model) = m.hasEyes && eyes(c, m).let { it.exists() && it.length() == m.eyesBytes }
+    fun eyesInstalled(c: Context, m: Model) = m.hasEyes && eyes(c, m).let { it.exists() && it.length() > 0 }
 
     /** Your own GGUFs (added from the app), as models without a download link. */
     fun own(c: Context): List<Model> = dir(c).listFiles { f ->
@@ -64,10 +66,16 @@ object ModelStore {
 
     fun byId(c: Context, id: String) = all(c).firstOrNull { it.id == id }
 
-    /** The brain in use, if it's on the phone. */
+    /**
+     * The brain in use, if it's on the phone. If the one you picked is gone (renamed in an update, say), she takes the
+     * biggest brain that is on the phone instead, so an update never leaves her without one.
+     */
     fun active(c: Context): Model? {
-        val m = byId(c, Prefs(c).brain) ?: return null
-        return if (m.url.isEmpty() || installed(c, m)) m else null
+        val prefs = Prefs(c)
+        byId(c, prefs.brain)?.let { if (it.url.isEmpty() || installed(c, it)) return it }
+        val m = all(c).filter { it.url.isEmpty() || installed(c, it) }.maxByOrNull { file(c, it).length() } ?: return null
+        prefs.brain = m.id
+        return m
     }
 
     fun ramGb(c: Context): Int {

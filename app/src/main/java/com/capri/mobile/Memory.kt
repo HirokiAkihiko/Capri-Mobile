@@ -85,6 +85,7 @@ class Memory private constructor(context: Context) {
     }
 
     private fun load() {
+        if (!file.exists()) return
         runCatching {
             val a = JSONArray(file.readText())
             for (i in 0 until a.length()) {
@@ -92,13 +93,20 @@ class Memory private constructor(context: Context) {
                 val f = o.getString("f")
                 if (!JUNK.containsMatchIn(f)) facts.add(Fact(f, o.getLong("t"), o.optLong("u")))  // older builds kept junk
             }
+        }.onFailure {  // a file she can't read is kept aside, never written over
+            runCatching { file.copyTo(File(file.path + ".unreadable-" + System.currentTimeMillis())) }
         }
     }
 
+    /** Written to a temp file first, then swapped in: a crash mid-write never leaves her memory half gone. */
     private fun save() {
         val a = JSONArray()
         for (f in facts) a.put(JSONObject().put("f", f.text).put("t", f.t).put("u", f.used))
-        runCatching { file.writeText(a.toString()) }
+        runCatching {
+            val tmp = File(file.path + ".tmp")
+            tmp.writeText(a.toString())
+            if (!tmp.renameTo(file)) { file.writeText(a.toString()); tmp.delete() }
+        }
     }
 
     companion object {

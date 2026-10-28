@@ -423,7 +423,7 @@ private fun SetupTab(tick: Int, refresh: () -> Unit) {
     var game by remember { mutableStateOf(prefs.game) }
     var feed by remember { mutableStateOf(prefs.feed) }
     var size by remember { mutableFloatStateOf(prefs.sizeDp.toFloat()) }
-    var bubbleTheme by remember { mutableIntStateOf(prefs.bubbleTheme) }
+    var bubbleStyle by remember { mutableIntStateOf(prefs.bubbleStyle) }
 
     Card("Permissions") {
         @Composable
@@ -464,18 +464,18 @@ private fun SetupTab(tick: Int, refresh: () -> Unit) {
     }
     Card("Chat bubble", "How her speech bubble looks on your screen.") {
         Row(Modifier.fillMaxWidth().background(SOFT, RoundedCornerShape(10.dp)).padding(3.dp)) {
-            listOf("Auto", "Light", "Dark").forEachIndexed { i, label ->
-                val sel = bubbleTheme == i
+            listOf("Classic", "Light", "Dark").forEachIndexed { i, label ->
+                val sel = bubbleStyle == i
                 Box(Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
                     .background(if (sel) PANEL else SOFT).then(if (sel) Modifier.border(1.dp, EDGE, RoundedCornerShape(8.dp)) else Modifier)
-                    .clickable { bubbleTheme = i; prefs.bubbleTheme = i }.padding(vertical = 9.dp),
+                    .clickable { bubbleStyle = i; prefs.bubbleStyle = i }.padding(vertical = 9.dp),
                     contentAlignment = Alignment.Center) {
                     Text(label, color = if (sel) INK else MUTED, fontFamily = SANS,
                         fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal, fontSize = 13.sp)
                 }
             }
         }
-        Text("Auto follows your phone's dark mode.", color = MUTED, fontFamily = SANS, fontSize = 12.sp)
+        Text("Classic is her original call box. Light and Dark are clean cards.", color = MUTED, fontFamily = SANS, fontSize = 12.sp)
     }
     Card("Size", "${size.toInt()} dp tall") {
         Slider(value = size, onValueChange = { size = it }, valueRange = 90f..240f,

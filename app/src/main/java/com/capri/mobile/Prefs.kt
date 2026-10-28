@@ -54,9 +54,9 @@ class Prefs(context: Context) {
         get() = sp.getString("chat", "[]") ?: "[]"
         set(v) = sp.edit().putString("chat", v).apply()
 
-    var bubbleTheme: Int  // her chat bubble: 0 = follow the phone, 1 = light, 2 = dark
-        get() = sp.getInt("bubble_theme", 0)
-        set(v) = sp.edit().putInt("bubble_theme", v).apply()
+    var bubbleStyle: Int  // her chat bubble: 0 = classic (dark call box), 1 = light card, 2 = dark card
+        get() = sp.getInt("bubble_style", 0)
+        set(v) = sp.edit().putInt("bubble_style", v).apply()
 
     fun count(g: Gift): Int = sp.getInt("gift_" + g.name, 0)
 
