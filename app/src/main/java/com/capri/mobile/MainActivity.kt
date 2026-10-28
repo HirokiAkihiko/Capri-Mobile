@@ -423,6 +423,7 @@ private fun SetupTab(tick: Int, refresh: () -> Unit) {
     var game by remember { mutableStateOf(prefs.game) }
     var feed by remember { mutableStateOf(prefs.feed) }
     var size by remember { mutableFloatStateOf(prefs.sizeDp.toFloat()) }
+    var bubbleTheme by remember { mutableIntStateOf(prefs.bubbleTheme) }
 
     Card("Permissions") {
         @Composable
@@ -454,12 +455,27 @@ private fun SetupTab(tick: Int, refresh: () -> Unit) {
     Card("Her behaviour") {
         Toggle("Roam", "zaps to a new spot every half a minute or so", roam) { roam = it; prefs.roam = it }
         Toggle("Talk", "greetings, reactions, battery and charger lines", talk) { talk = it; prefs.talk = it }
-        Toggle("Blips", "retro talking sounds while she types", blips) { blips = it; prefs.blips = it }
+        Toggle("Blips", "soft ticks while she types", blips) { blips = it; prefs.blips = it }
         Toggle("Tilt slide", "she slides to the low side when you tilt your phone", tilt) { tilt = it; prefs.tilt = it }
         Toggle("Shake", "shake her dizzy; a hard shake throws her", shake) { shake = it; prefs.shake = it }
         Toggle("Game", "gifts she drops and achievements to unlock. Off: just her", game) { game = it; prefs.game = it }
         Toggle("Scroll with me", "in TikTok, Reels, Shorts, Reddit, X she reads the captions and comments and " +
             "sometimes reacts. Needs a brain + accessibility. Never stored.", feed) { feed = it; prefs.feed = it }
+    }
+    Card("Chat bubble", "How her speech bubble looks on your screen.") {
+        Row(Modifier.fillMaxWidth().background(SOFT, RoundedCornerShape(10.dp)).padding(3.dp)) {
+            listOf("Auto", "Light", "Dark").forEachIndexed { i, label ->
+                val sel = bubbleTheme == i
+                Box(Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
+                    .background(if (sel) PANEL else SOFT).then(if (sel) Modifier.border(1.dp, EDGE, RoundedCornerShape(8.dp)) else Modifier)
+                    .clickable { bubbleTheme = i; prefs.bubbleTheme = i }.padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center) {
+                    Text(label, color = if (sel) INK else MUTED, fontFamily = SANS,
+                        fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal, fontSize = 13.sp)
+                }
+            }
+        }
+        Text("Auto follows your phone's dark mode.", color = MUTED, fontFamily = SANS, fontSize = 12.sp)
     }
     Card("Size", "${size.toInt()} dp tall") {
         Slider(value = size, onValueChange = { size = it }, valueRange = 90f..240f,

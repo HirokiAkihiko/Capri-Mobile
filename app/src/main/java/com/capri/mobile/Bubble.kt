@@ -23,19 +23,18 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.random.Random
 
-/** RPG-style talking blips, like the desktop: a short synth chirp per couple of letters, pitch wobbling a bit. */
+/** Soft talking ticks while her bubble types: a short, quiet sine "tik", a few per line, pitch varying a little. */
 class Blips {
     private val rate = 22050
-    private val tracks = (0 until 5).map { i -> make(520f + i * 70f) }
+    private val tracks = (0 until 4).map { i -> make(380f + i * 30f) }
     private var next = 0
 
     private fun make(freq: Float): AudioTrack? = runCatching {
-        val n = (rate * 0.045f).toInt()
+        val n = (rate * 0.03f).toInt()
         val pcm = ShortArray(n) { k ->
             val t = k / rate.toFloat()
-            val square = if (sin(2 * PI * freq * t) >= 0) 1f else -1f
-            val env = exp(-t * 55f) * minOf(1f, k / 40f)
-            (square * env * 0.16f * Short.MAX_VALUE).toInt().toShort()
+            val env = exp(-t * 90f) * minOf(1f, k / 60f)  // quick fade in, quick fade out: no click
+            (sin(2 * PI * freq * t).toFloat() * env * 0.06f * Short.MAX_VALUE).toInt().toShort()
         }
         AudioTrack.Builder()
             .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME)
@@ -102,6 +101,21 @@ class BubbleView(context: Context, private val dp: Float) : View(context) {
     init {
         setLayerType(LAYER_TYPE_SOFTWARE, null)  // the card's soft shadow
     }
+
+    /** Dark bubble: near-black card, soft hairline, light text (same layout). */
+    var dark = false
+        set(v) {
+            if (field == v) return
+            field = v
+            panel.color = if (v) 0xFF1C1B1F.toInt() else 0xFFFFFFFF.toInt()
+            panel.setShadowLayer(5 * dp, 0f, 1.5f * dp, if (v) 0x55000000 else 0x26000000)
+            edge.color = if (v) 0xFF34323A.toInt() else 0xFFE6E6E6.toInt()
+            name.color = if (v) 0xFFF2EFF4.toInt() else 0xFF111111.toInt()
+            body.color = if (v) 0xFFEDEAF0.toInt() else 0xFF111111.toInt()
+            youPaint.color = if (v) 0xFF9A96A0.toInt() else 0xFF8A8A8A.toInt()
+            pink.color = if (v) 0xFFF2A3BF.toInt() else 0xFFE2558A.toInt()
+            invalidate()
+        }
 
     /** Sets the line and measures the box; returns its (width, height). */
     fun set(text: String, you: String = "", keep: Boolean = false): Pair<Int, Int> {

@@ -308,7 +308,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         gifts(dt)
         feed()
         memoryBeat()
-        if (badges.isNotEmpty() && !bubbleOn && visible() && now > badgeAt) announce(badges.removeAt(0))
         talk(dt)
         if (herOn) {
             placeHer()
@@ -708,28 +707,9 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     }
 
     // -- achievements -------------------------------------------------------------------------------------------
-    private val badges = ArrayList<Badge>()
-    private var badgeAt = 0f
-
-    /** New badges wait until her bubble is free, then she shows them off one by one. */
-    private fun earn(new: List<Badge>) {
-        if (!prefs.game) return  // the game's off: progress still counts quietly, no announcements
-        badges.addAll(new)
-        if (new.isNotEmpty()) badgeAt = now + 1.5f
-    }
-
-    private fun announce(b: Badge) {
-        val c = sprites[her.clip]
-        val col = Achievements.tierColors[b.tier]
-        fx.splash(herLp.x + herLp.width / 2f, herLp.y + herLp.height / 2f - c.h * 0.3f,
-            intArrayOf(col, 0xFFFFFFFF.toInt(), col), 3f * dp, 30)
-        showFx()
-        her.flash = 0.6f
-        play(if (mode == Mode.PERCH) "perch_blink" else "grin")
-        lastTouch = now  // shows even with Talk off
-        say("UNLOCKED // ${b.title}\n${b.how}.")
-        badgeAt = now + 4f
-    }
+    /** Badges unlock quietly (they're already saved by Achievements): you find them in the Stash, no pop-ups. */
+    @Suppress("UNUSED_PARAMETER")
+    private fun earn(new: List<Badge>) = Unit
 
     // -- scroll with me: she watches your feed and sometimes has something to say -------------------------------
     private val feeds = mapOf(
@@ -1110,6 +1090,12 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         if (!prefs.talk && !asked) return
         talkOverChip = mode == Mode.CHIP
         talkText = text
+        bubble.dark = when (prefs.bubbleTheme) {
+            1 -> false
+            2 -> true
+            else -> (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES  // follow the phone
+        }
         val (w, h) = bubble.set(text, you, keep = live)
         bubbleLp.width = w
         bubbleLp.height = h
@@ -1119,6 +1105,8 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         if (!bubbleOn) { wm.addView(bubble, bubbleLp); bubbleOn = true } else wm.updateViewLayout(bubble, bubbleLp)
         bubble.invalidate()
     }
+
+    private var lastBlip = 0f
 
     private fun hush() {
         if (bubbleOn) runCatching { wm.removeView(bubble) }
@@ -1130,12 +1118,15 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         if (now > talkUntil || mode == Mode.HIDDEN || (talkOverChip != (mode == Mode.CHIP) && mode != Mode.AWAY)) { hush(); return }
         typeT += dt
         var typed = 0
-        while (typeT > 1 / 38f && !bubble.done) {  // ~38 letters a second, a blip every other letter
+        while (typeT > 1 / 38f && !bubble.done) {  // ~38 letters a second
             typeT -= 1 / 38f
             bubble.type()
             typed++
         }
-        if (typed > 0 && prefs.blips && (now * 19).toInt() % 2 == 0) (blips ?: Blips().also { blips = it }).blip()
+        if (typed > 0 && prefs.blips && now - lastBlip > 0.14f) {  // a soft tick every few letters, not every letter
+            lastBlip = now
+            (blips ?: Blips().also { blips = it }).blip()
+        }
         placeBubble()
         wm.updateViewLayout(bubble, bubbleLp)
     }
