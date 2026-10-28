@@ -22,6 +22,8 @@ any non-commercial purpose.
 | Capri sprite art (all of her animations, the app icon and the nap art are cut from it) | `app/src/main/assets/sprites`, `face.png`, `nap.png` | Lachy, [github.com/lachydotmcg](https://github.com/lachydotmcg) | PolyForm Noncommercial 1.0.0, see [`app/src/main/assets/LICENSE.md`](app/src/main/assets/LICENSE.md). Required Notice: Copyright 2026 Lachy (https://github.com/lachydotmcg) |
 | llama.cpp, ggml, mtmd (compiled into the app) | `third_party/llama.cpp` | The ggml authors | MIT, see [`app/src/main/assets/LICENSE-llama.cpp.txt`](app/src/main/assets/LICENSE-llama.cpp.txt) |
 | Share Tech Mono font | `app/src/main/res/font` | Carrois Apostrophe | SIL Open Font License 1.1, see [`app/src/main/assets/OFL-ShareTechMono.txt`](app/src/main/assets/OFL-ShareTechMono.txt) |
+| Manrope font | `app/src/main/res/font` | The Manrope Project Authors | SIL Open Font License 1.1, see [`app/src/main/assets/OFL-Manrope.txt`](app/src/main/assets/OFL-Manrope.txt) |
+| Fraunces font | `app/src/main/res/font` | The Fraunces Project Authors | SIL Open Font License 1.1, see [`app/src/main/assets/OFL-Fraunces.txt`](app/src/main/assets/OFL-Fraunces.txt) |
 
 ## Models (not included, downloaded by the user)
 
