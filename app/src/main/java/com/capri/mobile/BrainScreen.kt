@@ -53,7 +53,10 @@ fun BrainSection(running: Boolean, card: @Composable (String, String, @Composabl
     var ask by remember { mutableStateOf("") }
     var importing by remember { mutableStateOf("") }
     var micOk by remember { mutableStateOf(ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
-    val mic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { micOk = it }
+    val mic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        micOk = it
+        if (it) CapriService.micAllowed(ctx)  // she may listen now too
+    }
     val ram = remember { ModelStore.ramGb(ctx) }
     LaunchedEffect(Unit) {
         while (true) {

@@ -56,11 +56,19 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         const val ACTION_BYE = "com.capri.mobile.BYE"
         const val ACTION_ASK = "com.capri.mobile.ASK"      // typed from the app: extra "text"
         const val ACTION_BRAIN = "com.capri.mobile.BRAIN"  // the chosen brain changed: (re)load it
+        const val ACTION_MIC = "com.capri.mobile.MIC"  // mic allowed in the app: she becomes allowed to listen too
         private const val CHANNEL = "capri"
         var running = false
             private set
         @Volatile var brainStatus = "no brain"  // for the app screen
         @Volatile var lastReply = ""
+        @Volatile var instance: CapriService? = null  // VoiceActivity hands what you said back through this
+        @Volatile var lastEarsError = ""  // the speech recognizer's last error, shown in the app (for debugging)
+
+        /** Tell a running Capri the mic was just allowed (the app is in front, so she may add the mic to her service). */
+        fun micAllowed(c: Context) {
+            if (running) c.startService(Intent(c, CapriService::class.java).setAction(ACTION_MIC))
+        }
 
         fun brainChanged(c: Context) {
             if (running) c.startService(Intent(c, CapriService::class.java).setAction(ACTION_BRAIN))
@@ -178,6 +186,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     override fun onCreate() {
         super.onCreate()
         running = true
+        instance = this
         startForegroundNow()
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         prefs = Prefs(this)
@@ -226,12 +235,14 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
             ACTION_BYE -> stopSelf()
             ACTION_ASK -> intent.getStringExtra("text")?.let { think(it) }
             ACTION_BRAIN -> loadBrain(quiet = false)
+            ACTION_MIC -> startForegroundNow()  // same notification, now also allowed to use the mic
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
         running = false
+        if (instance === this) instance = null
         if (CapriAccess.listener === this) CapriAccess.listener = null
         handler.removeCallbacksAndMessages(null)
         Choreographer.getInstance().removeFrameCallback(frame)
@@ -635,18 +646,44 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         }
         val e = ears ?: Ears(this, heard = { think(it) }, level = { }, failed = { why ->
             holdingToTalk = false
-            say(when (why) {
-                "nothing" -> "Didn't catch that, choom."
-                "mic" -> "I can't hear you: allow the mic in my app."
-                "net" -> "My ears need the net on this phone."
-                else -> "Ears glitched. Try again."
-            })
+            when (why) {
+                "nothing" -> say("Didn't catch that, choom.")
+                "mic" -> say("I can't hear you: allow the mic in my app.")
+                else -> {  // this phone's recognizer won't work from the overlay: its own voice popup instead
+                    lastEarsError = ears?.lastError.orEmpty()
+                    voicePopup()
+                }
+            }
         }).also { ears = it }
-        if (!e.available) { say("This phone has no speech recognition for me."); return }
+        if (!e.available) { voicePopup(); return }
         holdingToTalk = true
         say("listening...", hold = true)
         play(if (mode == Mode.PERCH) "perch_blink" else "blink")
         e.start()
+    }
+
+    /** The phone's own voice-typing popup (VoiceActivity): works where the overlay's recognizer can't. */
+    private fun voicePopup() {
+        try {
+            startActivity(Intent(this, VoiceActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION))
+            say("Talk into the popup, choom.", hold = true)
+        } catch (e: Exception) {
+            say("My ears glitched${if (lastEarsError.isNotEmpty()) " ($lastEarsError)" else ""}. Type to me in my app.")
+        }
+    }
+
+    /** What the voice popup heard (null: nothing / no voice typing; problem "" = you closed it). */
+    fun voiceResult(text: String?, problem: String?) {
+        handler.post {
+            holdingToTalk = false
+            when {
+                text != null -> think(text)
+                problem == "" -> hush()
+                problem != null -> say(problem)
+                else -> say("Didn't catch that, choom.")
+            }
+        }
     }
 
     private val LOOK = Regex("\\b(look at|looking at|see (this|that|my)|what do you see|what('?s| is) (this|that|on my screen)|" +
@@ -1336,7 +1373,15 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
             .addAction(0, "Nap / wake", nap)
             .addAction(0, "Jack out", bye)
             .build()
-        ServiceCompat.startForeground(this, 7, n,
-            if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0)
+        var types = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
+        val mic = Build.VERSION.SDK_INT >= 30 &&
+            checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (mic) types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        try {
+            ServiceCompat.startForeground(this, 7, n, types)
+        } catch (e: Exception) {  // the mic type can only be added while the app is in front: without it then
+            ServiceCompat.startForeground(this, 7, n,
+                if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0)
+        }
     }
 }

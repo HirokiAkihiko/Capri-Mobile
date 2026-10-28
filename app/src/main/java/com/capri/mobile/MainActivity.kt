@@ -105,6 +105,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(0, 0), navigationBarStyle = SystemBarStyle.light(0, 0))
         setContent { App() }
     }
+
+    override fun onResume() {
+        super.onResume()
+        // the mic may have been allowed in the phone's settings: while the app's in front, she may add it too
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            CapriService.micAllowed(this)
+        }
+    }
 }
 
 private enum class Tab(val label: String, val icon: String) {
@@ -328,7 +336,9 @@ private fun HomeTab(tick: Int, go: (Tab) -> Unit) {
                 Text("Say something...", color = MUTED, fontFamily = SANS, fontSize = 13.sp)
             }
             Spacer(Modifier.width(8.dp))
-            Box(Modifier.size(42.dp).background(INK, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(42.dp).background(INK, RoundedCornerShape(8.dp))
+                .clickable { ctx.startActivity(Intent(ctx, VoiceActivity::class.java)) },  // talk: the phone's voice popup
+                contentAlignment = Alignment.Center) {
                 LineIcon("mic", Color.White, 20.dp)
             }
         }
@@ -414,7 +424,10 @@ private fun SetupTab(tick: Int, refresh: () -> Unit) {
     val canDraw = remember(tick) { Settings.canDrawOverlays(ctx) }
     val access = remember(tick) { CapriAccess.enabled(ctx) }
     var micOk by remember(tick) { mutableStateOf(ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
-    val mic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { micOk = it; refresh() }
+    val mic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        micOk = it; refresh()
+        if (it) CapriService.micAllowed(ctx)  // she may listen now too
+    }
     var roam by remember { mutableStateOf(prefs.roam) }
     var talk by remember { mutableStateOf(prefs.talk) }
     var blips by remember { mutableStateOf(prefs.blips) }
