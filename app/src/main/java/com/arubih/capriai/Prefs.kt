@@ -38,6 +38,10 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("feed", true)
         set(v) = sp.edit().putBoolean("feed", v).apply()
 
+    var remember: Boolean  // long-term memory: she writes down facts about you and the people in your life
+        get() = sp.getBoolean("remember", true)
+        set(v) = sp.edit().putBoolean("remember", v).apply()
+
     var brain: String  // id of the model she thinks with (ModelStore)
         get() = sp.getString("brain", "") ?: ""
         set(v) = sp.edit().putString("brain", v).apply()

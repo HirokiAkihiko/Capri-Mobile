@@ -28,11 +28,12 @@ She floats over your apps, sits on your icons, scrolls TikTok with you, and talk
 | **Shake & tilt** | Shake your phone and she gets dizzy. Tilt it and she slides. Both can be switched off. |
 | **Sits on your apps** | Perches on app icons and buttons, falls off when they move. Throw her onto one. |
 | **Sees your screen** | Ask "look at this" / "what am I watching?" and she takes a look. Give her brain its **Eyes** (a small extra download) and she actually sees the screen; without them she reads its words. |
+| **Remembers your life** | Talk to her or show her something (a Discord DM, a profile) and she writes down what matters: who people are, their usernames, what they like, plans, birthdays. She brings it up later, and sometimes trolls you with it. Every memory is listed in the app: read it, delete it, or switch memory off. It never leaves your phone. |
 | **Talks back** | Hold her and talk. Her brain is an LLM running on your phone with llama.cpp. Pick one in the app, it downloads once and works offline. |
 | **Scroll with me** | In TikTok, Reels, Shorts, Reddit and X she reads the caption and comments and, every now and then, drops a reaction. Like a friend doomscrolling next to you. |
 | **Notices things** | Your charger, low battery, late nights, the app you open, unlocking your phone in the morning. |
 | **Hides when it matters** | Fullscreen videos and games: she steps away and comes back after. |
-| **Gifts & achievements** | She drops gifts now and then (from Eddies to a Relic fragment). 18 badges to unlock. Not into it? Switch the Game off in Setup. |
+| **Gifts & achievements** | She drops gifts now and then (from Eddies to a Relic fragment). 19 badges to unlock. Not into it? Switch the Game off in Setup. |
 | **Naps** | Hold her (no brain) or say "go to sleep": she curls up in a corner. Tap to wake her. |
 
 ## Install
@@ -61,11 +62,11 @@ Downloaded inside the app, smallest first. All run on the phone's CPU.
 **Eyes**: every brain except MiniCPM5 has an optional vision add-on (0.2–1 GB) that lets her look at your screen (Android 11+).
 
 Got your own? **Add your own .gguf** in the BRAIN tab: anything this llama.cpp version runs works.
-CapriAI2 models by [Ghasty3](https://huggingface.co/Ghasty3/CapriAI2).
+The CapriAI2 models were trained by **[ghasty3](https://github.com/ghasty3)** ([Hugging Face](https://huggingface.co/Ghasty3/CapriAI2)): she's the reason Capri sounds like Capri.
 
 ## Privacy
 
-Everything happens on your phone. No accounts, no analytics, no servers of ours. The only network traffic is downloading the brains you pick (from Hugging Face).
+Everything happens on your phone. No accounts, no analytics, no servers of ours. Her memories live in the app's private storage and you can read, delete or wipe them any time. The only network traffic is downloading the brains you pick (from Hugging Face).
 Accessibility is optional and only used to find icons to sit on, see which app is open and, with *Scroll with me* on, read a feed's text for a reaction. Nothing is saved or sent. Speech goes through your phone's own speech recognizer.
 
 ## Build from source
@@ -94,6 +95,7 @@ app/src/main/java/com/arubih/capriai/
 
 - **Capri, Cyberpunk: Edgerunners, Cyberpunk 2077** are trademarks and characters of CD PROJEKT S.A. *Cyberpunk* is a trademark of R. Talsorian Games. All rights to them stay with their owners.
 - **Sprite art** by [Lachy](https://github.com/lachydotmcg), [PolyForm Noncommercial 1.0.0](app/src/main/assets/LICENSE.md). The app icon and her nap are cut from it: **no official art, audio, logos or video** ship with this app.
+- **Model training**: the CapriAI2 models (MiniCPM5 2B, Qwen3.5 4B, Gemma 4 E4B, Nemotron E4B) by [ghasty3](https://github.com/ghasty3).
 - **llama.cpp** by [ggml-org](https://github.com/ggml-org/llama.cpp), MIT.
 - **Models** each keep their own license (Qwen: Apache 2.0, MiniCPM, Gemma, NVIDIA Nemotron): see their Hugging Face pages.
 - **Share Tech Mono** font by Carrois Apostrophe, [SIL Open Font License](app/src/main/assets/OFL-ShareTechMono.txt).

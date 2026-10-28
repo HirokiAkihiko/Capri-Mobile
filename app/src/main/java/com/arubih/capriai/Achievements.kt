@@ -31,6 +31,7 @@ enum class Badge(val title: String, val how: String, val counter: String = "", v
     FIRST_WORDS("First Words", "Talk to her", "talks", 1, glyph = "\""),
     CHATTERBOX("Chatterbox", "Talk to her 50 times", "talks", 50, 2, "\"\""),
     SCROLL_BUDDY("Doomscroll Buddy", "She reacts to your feed", "feed", 1, 1, "~"),
+    MEMORY_LANE("Memory Lane", "She remembers 10 things about your life", "memories", 10, 1, "&"),
     FIRST_GIFT("Finders Keepers", "Collect a gift", "gifts", 1, glyph = "$"),
     HOARDER("Hoarder", "Collect 25 gifts", "gifts", 25, 1, "$$"),
     LEGEND("Legendary", "Collect a legendary gift", "legend", 1, 2, "%"),

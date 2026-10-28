@@ -160,9 +160,40 @@ fun BrainSection(running: Boolean, card: @Composable (String, String, @Composabl
                         ask = ""
                     }
                 }
-                button("Forget chat", Color(0xFF3A2A44)) { Brain(ctx).forget() }
+                button("Clear chat", Color(0xFF3A2A44)) { prefs.chat = "[]" }
             }
             if (reply.isNotEmpty()) Text("CAPRI: $reply", color = CYAN, fontSize = 14.sp)
+        }
+    }
+
+    // her long-term memory: everything she wrote down, yours to read and delete
+    val memory = remember { Memory.get(ctx) }
+    var remembers by remember { mutableStateOf(prefs.remember) }
+    var sure by remember { mutableStateOf(false) }
+    val facts = remember(tick) { memory.all() }
+    card("HER MEMORY", "What she remembers about you and the people in your life: from your chats and what you show " +
+        "her. Only on this phone, never sent anywhere. ${facts.size} memories.") {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Remember things", color = TEXT, fontFamily = FontFamily.Monospace, fontSize = 14.sp,
+                    modifier = Modifier.weight(1f))
+                androidx.compose.material3.Switch(remembers, { remembers = it; prefs.remember = it },
+                    colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = Color(0xFF0A0514),
+                        checkedTrackColor = GREEN))
+            }
+            if (facts.isEmpty()) Text("Nothing yet. Tell her about your day, or hold her and say \"look at this\".",
+                color = MUTED, fontSize = 12.sp)
+            for (f in facts.take(60)) Row(verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x1878FAFF)).padding(start = 10.dp)) {
+                Text("> " + f.text, color = TEXT, fontSize = 13.sp, lineHeight = 17.sp, modifier = Modifier.weight(1f))
+                androidx.compose.material3.TextButton({ memory.forget(f.text); tick++ }) {
+                    Text("x", color = PINK, fontFamily = FontFamily.Monospace, fontSize = 16.sp)
+                }
+            }
+            if (facts.isNotEmpty()) button(if (sure) "Tap again: wipe it all" else "Forget everything",
+                if (sure) PINK else Color(0xFF3A2A44)) {
+                if (sure) { memory.forgetAll(); sure = false; tick++ } else sure = true
+            }
         }
     }
 }

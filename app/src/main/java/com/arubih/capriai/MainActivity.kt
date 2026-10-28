@@ -428,7 +428,8 @@ private fun AboutTab() {
             "Capri, Cyberpunk & Edgerunners" to "Capri, Cyberpunk: Edgerunners and Cyberpunk 2077 are trademarks and characters of CD PROJEKT S.A. Cyberpunk is a trademark of R. Talsorian Games. All rights to them stay with their owners.",
             "Sprites" to "Capri's sprite art by Lachy (github.com/lachydotmcg), PolyForm Noncommercial 1.0.0. The app icon " +
                 "and her nap are cut from it: no official art, audio or logos are in this app.",
-            "Brains" to "llama.cpp by ggml-org (MIT). CapriAI2 fine-tunes by Ghasty3. Each model keeps its own license (Qwen, MiniCPM, Gemma, NVIDIA Nemotron): see its Hugging Face page.",
+            "Model training" to "The CapriAI2 models, the ones trained to be Capri, by ghasty3 (github.com/ghasty3).",
+            "Brains" to "llama.cpp by ggml-org (MIT). Each model keeps its own license (Qwen, MiniCPM, Gemma, NVIDIA Nemotron): see its Hugging Face page.",
             "Font" to "Share Tech Mono by Carrois Apostrophe (SIL Open Font License).",
             "This app" to "Code under the PolyForm Noncommercial License 1.0.0: free to use and share, never for sale.",
             "Made by" to "the Capri crew. First Capri on a phone, ever.",

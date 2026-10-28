@@ -205,6 +205,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         CapriAccess.listener = this
         addProbe()
         brain = Brain(this)
+        brain.onRemembered = { facts -> remembered(facts) }
         loadBrain(quiet = true)
         // the entrance: she drops in from above the screen and lands with a splash
         footX = left + (right - left) * 0.72f
@@ -306,6 +307,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         if (fxOn && !fx.step(dt)) hideFx()
         gifts(dt)
         feed()
+        memoryBeat()
         if (badges.isNotEmpty() && !bubbleOn && visible() && now > badgeAt) announce(badges.removeAt(0))
         talk(dt)
         if (herOn) {
@@ -671,10 +673,11 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         }
         hush()
         handler.postDelayed({
+            val seen = access.screenText(900)  // names, usernames, messages: read exactly, and remembered
             access.screenshot { shot ->
                 if (shot == null) { say("Couldn't grab your screen, choom.", you = text); return@screenshot }
                 say("*looking*", you = text, hold = true)
-                brain.look(text, shot, live = { say(it, you = text, hold = true, live = true) }, done = { reply ->
+                brain.look(text, shot, seen = seen, live = { say(it, you = text, hold = true, live = true) }, done = { reply ->
                     lastReply = reply
                     if (reply.isNotEmpty()) earn(Achievements.bump(this, "talks"))
                     say(reply.ifEmpty { "My optics glitched. Try again?" }, you = text)
@@ -734,6 +737,37 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         "com.instagram.android" to "Instagram", "com.google.android.youtube" to "YouTube", "com.reddit.frontpage" to "Reddit",
         "com.twitter.android" to "X", "com.facebook.katana" to "Facebook",
     )
+    // -- her memory: what she saved, and memories she brings up on her own ------------------------------------------
+    private var lastShard = -999f
+    private var nextMemory = 600f
+
+    /** She just wrote something down: now and then she lets you know (that's the "she actually remembers" moment). */
+    private fun remembered(facts: List<String>) {
+        earn(Achievements.bump(this, "memories", facts.size))
+        if (now - lastShard < 120f || !visible()) return
+        lastShard = now
+        handler.postDelayed({
+            if (!bubbleOn && visible()) {
+                lastTouch = now
+                say("[memory shard] " + facts.first())
+                her.flash = 0.4f
+            }
+        }, 3500)
+    }
+
+    /** Every so often she remembers something about your life out of nowhere and brings it up (or trolls you with it). */
+    private fun memoryBeat() {
+        if (now < nextMemory || !visible() || bubbleOn || brain.loaded == null || brain.busy || !prefs.remember) return
+        nextMemory = now + 600f + Random.nextFloat() * 900f
+        if (Random.nextFloat() < 0.4f) return  // not every time: it should feel like her, not a timer
+        val fact = brain.memory.callback() ?: return
+        val user = prefs.userName.ifBlank { "your choom" }
+        brain.once("Out of nowhere you remember this about $user's life: \"$fact\". Bring it up in ONE short line, " +
+            "like a friend who remembers: ask about it, tease them about it, or troll them a little. Max 18 words.") { line ->
+            if (line.length > 3 && visible() && !bubbleOn) { lastTouch = now; say(line) }
+        }
+    }
+
     private var nextFeed = 0f
     private var lastFeedText = ""
 

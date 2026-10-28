@@ -27,7 +27,7 @@ any non-commercial purpose.
 
 The app downloads models the user picks, straight from Hugging Face. They are not part of this repository and each
 keeps its own license: Qwen3.5 (Apache 2.0), MiniCPM, Gemma (Gemma terms), NVIDIA Nemotron (NVIDIA Open Model License).
-CapriAI2 fine-tunes by [Ghasty3](https://huggingface.co/Ghasty3/CapriAI2). See each model's page.
+The CapriAI2 fine-tunes were trained by [ghasty3](https://github.com/ghasty3) ([Hugging Face](https://huggingface.co/Ghasty3/CapriAI2)). See each model's page.
 
 ## Takedowns
 
