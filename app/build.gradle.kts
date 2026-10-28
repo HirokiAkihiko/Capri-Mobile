@@ -1,7 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+// Release signing settings (see signingConfigs below), read from local.properties
+val capriProps: Properties = Properties().also { props ->
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { props.load(it) }
+}
+val keystore: File? = capriProps.getProperty("capri.keystore")?.let { file(it) }?.takeIf { it.exists() }
 
 android {
     namespace = "com.capri.mobile"
@@ -37,11 +46,26 @@ android {
         }
     }
 
+    // Release signing: the key's location and passwords live in local.properties (never committed). Every release must
+    // use the same key, or phones refuse it as an update. Without those lines, release builds use the debug key.
+    signingConfigs {
+        if (keystore != null) create("capri") {
+            storeFile = keystore
+            storePassword = capriProps.getProperty("capri.storePassword")
+            keyAlias = capriProps.getProperty("capri.keyAlias")
+            keyPassword = capriProps.getProperty("capri.keyPassword")
+            enableV1Signing = true  // older or stricter installers (some Xiaomi/HyperOS phones) check v1 too
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
     buildTypes {
         release {
             optimization {
                 enable = false
             }
+            signingConfig = signingConfigs.findByName("capri") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {
