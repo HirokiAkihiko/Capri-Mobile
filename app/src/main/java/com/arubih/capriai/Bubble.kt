@@ -17,6 +17,7 @@ import android.text.StaticLayout
 import android.text.TextPaint
 import android.view.MotionEvent
 import android.view.View
+import androidx.core.content.res.ResourcesCompat
 import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.sin
@@ -59,30 +60,36 @@ class Blips {
 }
 
 /**
- * Her speech bubble: the call-style box from the desktop, small. Her face on the left, CAPRI, and the line typing
- * itself out. Tap it to close it early.
+ * Her speech bubble, Paper style: a white card with a hairline border and a soft shadow (so it reads over any app),
+ * her face, "Capri" with a pink dot, your line in grey, and hers typing itself out. Tap it to close it early.
  */
 @SuppressLint("ViewConstructor")
 class BubbleView(context: Context, private val dp: Float) : View(context) {
     private val face: Bitmap = context.assets.open("face.png").use { BitmapFactory.decodeStream(it) }
-    private val pad = 10 * dp
-    private val cam = 40 * dp
-    val maxW = (250 * dp).toInt()
-    private val textW = (maxW - pad * 3 - cam).toInt()
-    private val panel = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xF0110E16.toInt() }
-    private val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = 1.2f * dp; color = 0x55FFFFFF
+    private val sh = 6 * dp     // room around the card for its shadow
+    private val pad = 11 * dp
+    private val cam = 38 * dp
+    val maxW = (256 * dp).toInt()
+    private val textW = (maxW - 2 * sh - pad * 3 - cam).toInt()
+    private val sans = runCatching { ResourcesCompat.getFont(context, R.font.manrope_regular) }.getOrNull() ?: Typeface.DEFAULT
+    private val sansBold = runCatching { ResourcesCompat.getFont(context, R.font.manrope_extrabold) }.getOrNull()
+        ?: Typeface.DEFAULT_BOLD
+    private val panel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt()
+        setShadowLayer(5 * dp, 0f, 1.5f * dp, 0x26000000)
     }
-    private val pink = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFF1460.toInt() }
+    private val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeWidth = 1f * dp; color = 0xFFE6E6E6.toInt()
+    }
+    private val pink = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFE2558A.toInt() }
     private val name = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFF2EEF7.toInt(); textSize = 11 * dp; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        letterSpacing = 0.15f
+        color = 0xFF111111.toInt(); textSize = 12 * dp; typeface = sansBold
     }
     private val body = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFF2EEF7.toInt(); textSize = 13.5f * dp
+        color = 0xFF111111.toInt(); textSize = 13.5f * dp; typeface = sans
     }
-    private val img = Paint(Paint.FILTER_BITMAP_FLAG)
-    private val youPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF968CA5.toInt(); textSize = 11 * dp }
+    private val img = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+    private val youPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF8A8A8A.toInt(); textSize = 11 * dp; typeface = sans }
     private var full = ""
     private var you = ""
     private var youH = 0f
@@ -91,6 +98,10 @@ class BubbleView(context: Context, private val dp: Float) : View(context) {
     var onTap: (() -> Unit)? = null
     var heightPx = 0
         private set
+
+    init {
+        setLayerType(LAYER_TYPE_SOFTWARE, null)  // the card's soft shadow
+    }
 
     /** Sets the line and measures the box; returns its (width, height). */
     fun set(text: String, you: String = "", keep: Boolean = false): Pair<Int, Int> {
@@ -101,7 +112,7 @@ class BubbleView(context: Context, private val dp: Float) : View(context) {
         val l = StaticLayout.Builder.obtain(text, 0, text.length, body, textW).setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setLineSpacing(0f, 1.05f).build()
         layout = l
-        heightPx = maxOf((pad * 2 + cam).toInt(), (pad * 2 + 16 * dp + youH + l.height).toInt())
+        heightPx = maxOf((pad * 2 + cam).toInt(), (pad * 2 + 17 * dp + youH + l.height).toInt()) + (2 * sh).toInt()
         return maxW to heightPx
     }
 
@@ -116,29 +127,25 @@ class BubbleView(context: Context, private val dp: Float) : View(context) {
     val done get() = shown >= full.length
 
     override fun onDraw(canvas: Canvas) {
-        val w = width.toFloat()
-        val h = height.toFloat()
-        val c = 9 * dp  // chamfered corners, like the desktop box
-        val p = Path().apply {
-            moveTo(c, 0f); lineTo(w, 0f); lineTo(w, h - c); lineTo(w - c, h); lineTo(0f, h); lineTo(0f, c); close()
-        }
-        canvas.drawPath(p, panel)
-        canvas.drawPath(p, edge)
-        canvas.drawRect(0f, c, 2.5f * dp, h - c * 0.5f, pink)
-        val cam = RectF(pad, pad, pad + this.cam, pad + this.cam)
+        val card = RectF(sh, sh, width - sh, height - sh)
+        val r = 12 * dp
+        canvas.drawRoundRect(card, r, r, panel)
+        canvas.drawRoundRect(card, r, r, edge)
+        val cam = RectF(sh + pad, sh + pad, sh + pad + this.cam, sh + pad + this.cam)
+        canvas.save()
+        canvas.clipPath(Path().apply { addRoundRect(cam, 8 * dp, 8 * dp, Path.Direction.CW) })
         canvas.drawBitmap(face, null, cam, img)
-        edge.color = 0xAAFF1460.toInt()
-        canvas.drawRect(cam, edge)
-        edge.color = 0x55FFFFFF
-        val tx = pad * 2 + this.cam
-        canvas.drawText("CAPRI", tx, pad + 10 * dp, name)
-        if (you.isNotEmpty()) {  // your line, small and grey, like the desktop call box
+        canvas.restore()
+        val tx = sh + pad * 2 + this.cam
+        canvas.drawCircle(tx + 3 * dp, sh + pad + 6.5f * dp, 3 * dp, pink)
+        canvas.drawText("Capri", tx + 10 * dp, sh + pad + 11 * dp, name)
+        if (you.isNotEmpty()) {  // your line, small and grey
             val fit = youPaint.breakText(you, true, textW.toFloat(), null)
-            canvas.drawText(you, 0, fit, tx, pad + 16 * dp + 11 * dp, youPaint)
+            canvas.drawText(you, 0, fit, tx, sh + pad + 17 * dp + 11 * dp, youPaint)
         }
         val l = layout ?: return
         canvas.save()
-        canvas.translate(tx, pad + 16 * dp + youH)
+        canvas.translate(tx, sh + pad + 17 * dp + youH)
         canvas.clipRect(0f, 0f, textW.toFloat(), l.height.toFloat())
         // only the letters typed so far: draw the layout, then cover what isn't "out" yet line by line
         val upto = shown

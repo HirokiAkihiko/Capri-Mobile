@@ -89,7 +89,8 @@ class Memory private constructor(context: Context) {
             val a = JSONArray(file.readText())
             for (i in 0 until a.length()) {
                 val o = a.getJSONObject(i)
-                facts.add(Fact(o.getString("f"), o.getLong("t"), o.optLong("u")))
+                val f = o.getString("f")
+                if (!JUNK.containsMatchIn(f)) facts.add(Fact(f, o.getLong("t"), o.optLong("u")))  // older builds kept junk
             }
         }
     }

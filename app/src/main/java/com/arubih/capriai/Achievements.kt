@@ -2,14 +2,9 @@ package com.arubih.capriai
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.Shader
 import android.graphics.Typeface
 import java.util.Calendar
-import kotlin.math.cos
-import kotlin.math.sin
 
 /**
  * Badges you earn by hanging out with her. Counters live in the same prefs as everything else; an unlock shows up
@@ -69,42 +64,35 @@ object Achievements {
 
     private fun give(c: Context, b: Badge) = sp(c).edit().putBoolean("badge_" + b.name, true).apply()
 
-    val tierColors = intArrayOf(0xFF2BFF9A.toInt(), 0xFF78FAFF.toInt(), 0xFFFF1460.toInt())
+    /** Badge colours by tier, for the unlock sparkle: soft, tinted, pink. */
+    val tierColors = intArrayOf(0xFF111111.toInt(), 0xFF8A6CFF.toInt(), 0xFFE2558A.toInt())
 
-    /** A badge: a cut hexagon with its glyph, neon when earned, dim when not. Drawn at (0, 0) in an [s] square. */
+    /**
+     * A badge, Paper style: a thin circle with its glyph. Earned: ink (legendary: pink) with a pink dot; locked: a pale
+     * outline with a "?". Drawn at (0, 0) in an [s] square.
+     */
     fun draw(canvas: Canvas, b: Badge, s: Float, earned: Boolean) {
-        val col = if (earned) tierColors[b.tier] else 0xFF3A3346.toInt()
-        val hex = Path()
-        for (i in 0 until 6) {
-            val a = Math.toRadians(60.0 * i - 90)
-            val x = (s / 2 + s * 0.46 * cos(a)).toFloat()
-            val y = (s / 2 + s * 0.46 * sin(a)).toFloat()
-            if (i == 0) hex.moveTo(x, y) else hex.lineTo(x, y)
-        }
-        hex.close()
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        p.shader = LinearGradient(0f, 0f, 0f, s, if (earned) 0xFF1E1530.toInt() else 0xFF15111C.toInt(),
-            0xFF0A0514.toInt(), Shader.TileMode.CLAMP)
-        canvas.drawPath(hex, p)
-        p.shader = null
+        val ink = if (!earned) 0xFFD6D6D6.toInt() else if (b.tier == 2) 0xFFE2558A.toInt() else 0xFF111111.toInt()
+        p.color = if (earned) 0xFFFFFFFF.toInt() else 0xFFF7F7F7.toInt()
+        canvas.drawCircle(s / 2, s / 2, s * 0.44f, p)
         p.style = Paint.Style.STROKE
-        p.strokeWidth = s * 0.05f
-        p.color = col
-        canvas.drawPath(hex, p)
-        if (earned) {  // inner glow line
+        p.strokeWidth = s * (if (earned) 0.035f else 0.025f)
+        p.color = ink
+        canvas.drawCircle(s / 2, s / 2, s * 0.44f, p)
+        if (earned && b.tier >= 1) {  // rarer badges get a second, inner ring
             p.strokeWidth = s * 0.015f
-            p.alpha = 90
-            canvas.save()
-            canvas.scale(0.8f, 0.8f, s / 2, s / 2)
-            canvas.drawPath(hex, p)
-            canvas.restore()
+            canvas.drawCircle(s / 2, s / 2, s * 0.37f, p)
         }
         p.style = Paint.Style.FILL
-        p.alpha = 255
-        p.color = if (earned) col else 0xFF5A5266.toInt()
-        p.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        p.textSize = s * if (b.glyph.length > 1) 0.26f else 0.34f
+        p.typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+        p.textSize = s * if (b.glyph.length > 1) 0.26f else 0.32f
         p.textAlign = Paint.Align.CENTER
+        p.color = if (earned) ink else 0xFFC4C4C4.toInt()
         canvas.drawText(if (earned) b.glyph else "?", s / 2, s / 2 + p.textSize * 0.36f, p)
+        if (earned) {
+            p.color = 0xFFE2558A.toInt()
+            canvas.drawCircle(s * 0.80f, s * 0.20f, s * 0.07f, p)
+        }
     }
 }

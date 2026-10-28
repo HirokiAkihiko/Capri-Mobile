@@ -67,7 +67,7 @@ fun BrainSection(running: Boolean, card: @Composable (String, String, @Composabl
         if (uri != null) thread(name = "capri-import") { importGguf(ctx, uri) { importing = it } }
     }
 
-    card("BRAIN", "Pick a brain, she downloads it to your phone and runs it offline. Smallest first. " +
+    card("Pick a brain", "She downloads it to your phone and runs it offline. Smallest first. " +
         "Your phone: ~$ram GB RAM. Now: $status") {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             @Suppress("UNUSED_EXPRESSION") tick
@@ -77,26 +77,26 @@ fun BrainSection(running: Boolean, card: @Composable (String, String, @Composabl
                 val partial = ModelStore.part(ctx, m).let { if (it.exists()) it.length() else 0L }
                 val busy = dl.id == m.id && dl.error.isEmpty()
                 Column(
-                    Modifier.fillMaxWidth().border(1.dp, if (active == m.id && have) GREEN else Color(0x22FFFFFF))
-                        .background(Color(0xFF110C18)).padding(10.dp),
+                    Modifier.fillMaxWidth().border(1.dp, if (active == m.id && have) GREEN else EDGE)
+                        .background(PANEL).padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(m.label, color = TEXT, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                        Text("%.2f GB".format(m.bytes / 1e9), color = MUTED, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        Text("%.2f GB".format(m.bytes / 1e9), color = MUTED, fontFamily = SANS, fontSize = 12.sp)
                     }
                     Text(m.note + (if (m.capri) "  ·  CAPRI" else "") +
                         (if (m.minRamGb > 0) "  ·  ${m.minRamGb}+ GB RAM" else ""),
                         color = if (m.minRamGb > ram) PINK else MUTED, fontSize = 12.sp)
                     if (busy || (dl.id == m.id && dl.total > 0)) {
                         LinearProgressIndicator(progress = { if (dl.total > 0) dl.done.toFloat() / dl.total else 0f },
-                            modifier = Modifier.fillMaxWidth(), color = PINK, trackColor = Color(0x22FFFFFF))
+                            modifier = Modifier.fillMaxWidth(), color = PINK, trackColor = EDGE)
                         Text(if (busy) "%.2f / %.2f GB  ·  %.1f MB/s".format(dl.done / 1e9, dl.total / 1e9, dl.speed / 1e6)
-                            else "stopped: ${dl.error}", color = MUTED, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                            else "stopped: ${dl.error}", color = MUTED, fontSize = 11.sp, fontFamily = SANS)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         when {
-                            have && active == m.id -> Text("IN USE", color = GREEN, fontFamily = FontFamily.Monospace,
+                            have && active == m.id -> Text("IN USE", color = GREEN, fontFamily = SANS,
                                 fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
                             have -> button("Use", GREEN) { prefs.brain = m.id; CapriService.brainChanged(ctx); tick++ }
                             busy -> button("Pause", MUTED) { DownloadService.cancel(ctx) }
@@ -114,9 +114,9 @@ fun BrainSection(running: Boolean, card: @Composable (String, String, @Composabl
                         val eyesPart = java.io.File(ModelStore.eyes(ctx, m).path + ".part").let { if (it.exists()) it.length() else 0L }
                         val eyesBusy = dl.id == m.id + ":eyes" && dl.error.isEmpty()
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x2278FAFF)).padding(8.dp)) {
+                            modifier = Modifier.fillMaxWidth().border(1.dp, EDGE).padding(8.dp)) {
                             Column(Modifier.weight(1f)) {
-                                Text("+ EYES  ·  %.0f MB".format(m.eyesBytes / 1e6), color = CYAN, fontFamily = FontFamily.Monospace,
+                                Text("+ EYES  ·  %.0f MB".format(m.eyesBytes / 1e6), color = CYAN, fontFamily = SANS,
                                     fontSize = 13.sp)
                                 Text(if (eyesOn) "she can look at your screen" else if (eyesBusy) "%.0f / %.0f MB".format(
                                     dl.done / 1e6, dl.total / 1e6) else "lets her look at your screen (Android 11+)",
@@ -146,7 +146,7 @@ fun BrainSection(running: Boolean, card: @Composable (String, String, @Composabl
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!micOk) button("Allow mic", PINK) { mic.launch(Manifest.permission.RECORD_AUDIO) }
             val colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TEXT, unfocusedTextColor = TEXT,
-                focusedBorderColor = PINK, unfocusedBorderColor = Color(0x44FFFFFF), cursorColor = PINK,
+                focusedBorderColor = PINK, unfocusedBorderColor = EDGE, cursorColor = PINK,
                 focusedLabelColor = CYAN, unfocusedLabelColor = MUTED)
             OutlinedTextField(name, { name = it; prefs.userName = it.trim() }, label = { Text("What she calls you") },
                 singleLine = true, colors = colors, modifier = Modifier.fillMaxWidth())
@@ -175,19 +175,19 @@ fun BrainSection(running: Boolean, card: @Composable (String, String, @Composabl
         "her. Only on this phone, never sent anywhere. ${facts.size} memories.") {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Remember things", color = TEXT, fontFamily = FontFamily.Monospace, fontSize = 14.sp,
+                Text("Remember things", color = TEXT, fontFamily = SANS, fontSize = 14.sp,
                     modifier = Modifier.weight(1f))
                 androidx.compose.material3.Switch(remembers, { remembers = it; prefs.remember = it },
-                    colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = Color(0xFF0A0514),
-                        checkedTrackColor = GREEN))
+                    colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = Color.White,
+                        checkedTrackColor = INK))
             }
             if (facts.isEmpty()) Text("Nothing yet. Tell her about your day, or hold her and say \"look at this\".",
                 color = MUTED, fontSize = 12.sp)
             for (f in facts.take(60)) Row(verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0x1878FAFF)).padding(start = 10.dp)) {
+                modifier = Modifier.fillMaxWidth().border(1.dp, EDGE).padding(start = 10.dp)) {
                 Text("> " + f.text, color = TEXT, fontSize = 13.sp, lineHeight = 17.sp, modifier = Modifier.weight(1f))
                 androidx.compose.material3.TextButton({ memory.forget(f.text); tick++ }) {
-                    Text("x", color = PINK, fontFamily = FontFamily.Monospace, fontSize = 16.sp)
+                    Text("x", color = PINK, fontFamily = SANS, fontSize = 16.sp)
                 }
             }
             if (facts.isNotEmpty()) button(if (sure) "Tap again: wipe it all" else "Forget everything",

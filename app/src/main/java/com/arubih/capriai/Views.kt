@@ -109,8 +109,8 @@ class ChipView(context: Context, val widthPx: Int) : View(context) {
 
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val z = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        color = 0xFF78FAFF.toInt()
+        typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+        color = 0xFFE2558A.toInt()
     }
     private val dst = RectF()
 
