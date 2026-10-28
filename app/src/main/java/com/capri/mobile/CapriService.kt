@@ -1,4 +1,4 @@
-package com.arubih.capriai
+package com.capri.mobile
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -52,10 +52,10 @@ import kotlin.random.Random
  */
 class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     companion object {
-        const val ACTION_NAP = "com.arubih.capriai.NAP"  // nap / wake, from the notification
-        const val ACTION_BYE = "com.arubih.capriai.BYE"
-        const val ACTION_ASK = "com.arubih.capriai.ASK"      // typed from the app: extra "text"
-        const val ACTION_BRAIN = "com.arubih.capriai.BRAIN"  // the chosen brain changed: (re)load it
+        const val ACTION_NAP = "com.capri.mobile.NAP"  // nap / wake, from the notification
+        const val ACTION_BYE = "com.capri.mobile.BYE"
+        const val ACTION_ASK = "com.capri.mobile.ASK"      // typed from the app: extra "text"
+        const val ACTION_BRAIN = "com.capri.mobile.BRAIN"  // the chosen brain changed: (re)load it
         private const val CHANNEL = "capri"
         var running = false
             private set

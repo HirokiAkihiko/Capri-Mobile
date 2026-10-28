@@ -1,4 +1,4 @@
-package com.arubih.capriai
+package com.capri.mobile
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

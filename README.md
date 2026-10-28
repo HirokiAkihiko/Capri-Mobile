@@ -80,7 +80,7 @@ git clone https://github.com/Capri-cmd/Capri-Mobile.git
 llama.cpp lives in `third_party/llama.cpp`: the parts the app needs from tag **b11932** (the same build as the desktop Capri), MIT licensed. It's compiled into `libcapri_llama.so` by `app/src/main/cpp/CMakeLists.txt`, with a small JNI bridge in `capri_llama.cpp`. Open the project, let Gradle sync, and run. The APK also carries an x86_64 build, so it runs on the emulator.
 
 ```
-app/src/main/java/com/arubih/capriai/
+app/src/main/java/com/capri/mobile/
   CapriService.kt   her: movement, touch, senses, talking, gifts, achievements
   CapriAccess.kt    accessibility: icons to sit on, the app in front, feed text
   Brain.kt          her character sheet, memory, llama.cpp calls

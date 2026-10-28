@@ -1,4 +1,4 @@
-package com.arubih.capriai.ui.theme
+package com.capri.mobile.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

@@ -4,13 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "com.arubih.capriai"
+    namespace = "com.capri.mobile"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.arubih.capriai"
+        applicationId = "com.capri.mobile"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

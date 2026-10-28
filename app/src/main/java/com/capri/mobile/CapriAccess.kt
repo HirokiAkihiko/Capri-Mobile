@@ -1,4 +1,4 @@
-package com.arubih.capriai
+package com.capri.mobile
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Context

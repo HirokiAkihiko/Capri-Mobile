@@ -1,4 +1,4 @@
-package com.arubih.capriai
+package com.capri.mobile
 
 import android.annotation.SuppressLint
 import android.content.Context

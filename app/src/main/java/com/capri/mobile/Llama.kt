@@ -1,4 +1,4 @@
-package com.arubih.capriai
+package com.capri.mobile
 
 /** llama.cpp (b11932, the same build as the desktop) compiled into the app: native code in src/main/cpp. */
 object Llama {

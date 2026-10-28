@@ -100,7 +100,7 @@ bool decode(Brain * b, const llama_token * toks, int n) {
 }  // namespace
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_arubih_capriai_Llama_load(JNIEnv * env, jobject, jstring jpath, jint n_ctx, jint n_threads) {
+Java_com_capri_mobile_Llama_load(JNIEnv * env, jobject, jstring jpath, jint n_ctx, jint n_threads) {
     static std::once_flag once;
     std::call_once(once, [] {
         llama_log_set(on_log, nullptr);
@@ -142,12 +142,12 @@ Java_com_arubih_capriai_Llama_load(JNIEnv * env, jobject, jstring jpath, jint n_
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_arubih_capriai_Llama_error(JNIEnv * env, jobject) {
+Java_com_capri_mobile_Llama_error(JNIEnv * env, jobject) {
     return to_java(env, g_error);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_arubih_capriai_Llama_generate(JNIEnv * env, jobject, jlong handle, jobjectArray roles, jobjectArray contents,
+Java_com_capri_mobile_Llama_generate(JNIEnv * env, jobject, jlong handle, jobjectArray roles, jobjectArray contents,
                                        jint max_tokens, jfloat temperature, jobject piece) {
     auto * b = (Brain *) handle;
     if (!b) return to_java(env, "");
@@ -243,7 +243,7 @@ Java_com_arubih_capriai_Llama_generate(JNIEnv * env, jobject, jlong handle, jobj
 
 // -- her eyes -----------------------------------------------------------------------------------------------------
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_arubih_capriai_Llama_loadEyes(JNIEnv * env, jobject, jlong handle, jstring jpath, jint n_threads) {
+Java_com_capri_mobile_Llama_loadEyes(JNIEnv * env, jobject, jlong handle, jstring jpath, jint n_threads) {
     auto * b = (Brain *) handle;
     if (!b) return JNI_FALSE;
     if (b->eyes) { mtmd_free(b->eyes); b->eyes = nullptr; }
@@ -267,7 +267,7 @@ Java_com_arubih_capriai_Llama_loadEyes(JNIEnv * env, jobject, jlong handle, jstr
 
 // Like generate(), but the last user message has a picture: "{IMAGE}" in its text marks where it goes.
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_arubih_capriai_Llama_look(JNIEnv * env, jobject, jlong handle, jbyteArray rgb, jint w, jint h,
+Java_com_capri_mobile_Llama_look(JNIEnv * env, jobject, jlong handle, jbyteArray rgb, jint w, jint h,
                                    jobjectArray roles, jobjectArray contents, jint max_tokens, jfloat temperature,
                                    jobject piece) {
     auto * b = (Brain *) handle;
@@ -358,7 +358,7 @@ Java_com_arubih_capriai_Llama_look(JNIEnv * env, jobject, jlong handle, jbyteArr
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_arubih_capriai_Llama_free(JNIEnv *, jobject, jlong handle) {
+Java_com_capri_mobile_Llama_free(JNIEnv *, jobject, jlong handle) {
     auto * b = (Brain *) handle;
     if (!b) return;
     if (b->eyes) mtmd_free(b->eyes);
