@@ -27,6 +27,7 @@ class Ears(private val context: Context, private val heard: (String) -> Unit, pr
     private var offline = true  // ask for on-device recognition first
     private var onDevice = false  // Android 12+: the phone's on-device engine instead of the default one
     private var tries = 0
+    private var wanted = false  // you're still holding her: only then does a hiccup get retried
     var lastError = ""  // e.g. "LANGUAGE_UNAVAILABLE (13)", for whoever's debugging (logcat tag CapriEars)
         private set
 
@@ -36,6 +37,7 @@ class Ears(private val context: Context, private val heard: (String) -> Unit, pr
     fun start() {
         if (listening) return
         tries = 0
+        wanted = true
         begin()
     }
 
@@ -55,6 +57,10 @@ class Ears(private val context: Context, private val heard: (String) -> Unit, pr
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
             override fun onError(error: Int) {
                 listening = false
+                if (!wanted && error != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                    failed("nothing")  // you let go before it got going: no retries, no popup
+                    return
+                }
                 when (error) {
                     SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> failed("nothing")
                     SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> failed("mic")
@@ -75,6 +81,7 @@ class Ears(private val context: Context, private val heard: (String) -> Unit, pr
             }
             override fun onResults(results: Bundle?) {
                 listening = false
+                wanted = false
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
                 if (text.isBlank()) failed("nothing") else heard(text)
             }
@@ -102,6 +109,11 @@ class Ears(private val context: Context, private val heard: (String) -> Unit, pr
 
     private fun retry() {
         tries++
+        if (!wanted) {  // you let go meanwhile
+            listening = false
+            failed("nothing")
+            return
+        }
         if (tries > 4) {
             fail("GAVE_UP", -3)
             return
@@ -127,12 +139,15 @@ class Ears(private val context: Context, private val heard: (String) -> Unit, pr
 
     /** Let go of her: stop listening and use what was said. */
     fun stop() {
-        if (listening) sr?.stopListening()
+        if (!listening) return
+        wanted = false  // a hiccup from here on isn't retried (that started her listening again after you let go)
+        sr?.stopListening()  // what was said so far still comes back in onResults
     }
 
     fun release() {
         fresh()
         listening = false
+        wanted = false
     }
 
     companion object {

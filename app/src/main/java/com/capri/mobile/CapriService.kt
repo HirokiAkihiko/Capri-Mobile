@@ -48,7 +48,7 @@ import kotlin.random.Random
  * Capri on your phone: a foreground service that keeps her floating over every app. She stands on the bottom of
  * the screen (or sits on app icons and buttons, with the accessibility switch on), blinks and glitches, zaps around,
  * reacts to pokes, shakes, tilts, your charger, your battery, the time and the app you open, peeks out from the
- * screen edges, hides during fullscreen videos and games, drops little gifts, and naps in the corner.
+ * screen edges, hides during fullscreen videos and games, and naps in the corner.
  */
 class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     companion object {
@@ -172,15 +172,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     private var ears: Ears? = null
     private var holdingToTalk = false
 
-    // gifts
-    private var nextGift = 0f
-    private var gift: GiftView? = null
-    private lateinit var giftLp: WindowManager.LayoutParams
-    private var giftX = 0f
-    private var giftY = 0f
-    private var giftVy = 0f
-    private var giftUntil = 0f
-
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -201,7 +192,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         fxLp = overlayParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT, false)
         bubble = BubbleView(this, dp).apply { onTap = ::hush }
         bubbleLp = overlayParams(bubble.maxW, 10, touchable = true)
-        nextGift = 60f * (6 + Random.nextFloat() * 10)
         sensors = getSystemService(SENSOR_SERVICE) as SensorManager
         ContextCompat.registerReceiver(this, events, IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
@@ -225,8 +215,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         sense(true)
         startLoop()
         handler.postDelayed({ greet() }, 1800)
-        earn(listOfNotNull(Achievements.unlock(this, Badge.JACKED_IN)) + Achievements.dayVisit(this))
-        if (hour() in 0..4) earn(Achievements.bump(this, "night"))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -249,7 +237,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         sense(false)
         runCatching { unregisterReceiver(events) }
         for ((v, on) in listOf(her to herOn, chip to chipOn, fx to fxOn, bubble to bubbleOn)) if (on) runCatching { wm.removeView(v) }
-        gift?.let { runCatching { wm.removeView(it) } }
         probe?.let { runCatching { wm.removeView(it) } }
         blips?.release()
         ears?.release()
@@ -316,7 +303,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         her.split = if (glitchFor > 0) (2f + Random.nextFloat() * 5f) * dp else her.split * exp(-dt * 12f)
         her.flash = maxOf(0f, her.flash - dt * 2.5f)
         if (fxOn && !fx.step(dt)) hideFx()
-        gifts(dt)
         feed()
         memoryBeat()
         talk(dt)
@@ -465,7 +451,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
 
     private fun sit(r: Rect) {
         perch = Rect(r)
-        earn(Achievements.bump(this, "perches"))
         footY = r.top.toFloat()
         footX = footX.coerceIn(r.left + 4 * dp, r.right - 4 * dp)
         vx = 0f; vy = 0f
@@ -477,7 +462,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
 
     private fun peek(leftSide: Boolean) {
         mode = Mode.PEEK
-        earn(Achievements.bump(this, "peeks"))
         peekLeft = leftSide
         val c = sprites["idle"]
         peekY = (footY - c.ay * c.h + c.h / 2f).coerceIn(top + c.w, floor - c.w)
@@ -548,7 +532,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
                     vx = tracker?.xVelocity ?: 0f
                     vy = tracker?.yVelocity ?: 0f
                     mode = Mode.FALL
-                    if (hypot(vx, vy) > 1500f * k) earn(Achievements.bump(this, "throws"))
                     if (hypot(vx, vy) > 3500f * k && Random.nextFloat() < 0.4f) say(Lines.pick(Lines.thrown))
                 } else if (e.actionMasked == MotionEvent.ACTION_UP && !longPressed) {
                     tap(e.x, e.y)
@@ -571,12 +554,10 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         if (now < grumpyUntil) return
         pokes.add(now)
         pokes.removeAll { now - it > 3f }
-        earn(Achievements.bump(this, "pokes"))
         if (pokes.size >= 5) {
             pokes.clear()
             handler.removeCallbacks(singleTap)
             grumpyUntil = now + 15f
-            earn(Achievements.bump(this, "mad"))
             glitchFor = 0.9f
             her.flash = 0.5f
             say(Lines.pick(Lines.mad))
@@ -633,7 +614,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         brain.load(m) { err ->
             brainStatus = if (err == null) "${m.label} online" + (if (brain.canSee) " + eyes" else "")
             else "couldn't load ${m.label}: $err"
-            if (err == null) earn(listOfNotNull(Achievements.unlock(this, Badge.BIG_BRAIN)))
             if (err != null) say("Brain glitch. That one won't boot on this phone.")
             else if (!quiet) say("Brain online. Hold me and talk.")
         }
@@ -715,7 +695,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
                 say("*looking*", you = text, hold = true)
                 brain.look(text, shot, seen = seen, live = { say(it, you = text, hold = true, live = true) }, done = { reply ->
                     lastReply = reply
-                    if (reply.isNotEmpty()) earn(Achievements.bump(this, "talks"))
                     say(reply.ifEmpty { "My optics glitched. Try again?" }, you = text)
                 })
             }
@@ -738,15 +717,9 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         say("...", you = text, hold = true)
         brain.ask(text, live = { say(it, you = text, hold = true, live = true) }) { reply ->
             lastReply = reply
-            if (reply.isNotEmpty()) earn(Achievements.bump(this, "talks"))
             say(reply.ifEmpty { "My brain fizzled. Say that again?" }, you = text)
         }
     }
-
-    // -- achievements -------------------------------------------------------------------------------------------
-    /** Badges unlock quietly (they're already saved by Achievements): you find them in the Stash, no pop-ups. */
-    @Suppress("UNUSED_PARAMETER")
-    private fun earn(new: List<Badge>) = Unit
 
     // -- scroll with me: she watches your feed and sometimes has something to say -------------------------------
     private val feeds = mapOf(
@@ -760,7 +733,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
 
     /** She just wrote something down: now and then she lets you know (that's the "she actually remembers" moment). */
     private fun remembered(facts: List<String>) {
-        earn(Achievements.bump(this, "memories", facts.size))
         if (now - lastShard < 120f || !visible()) return
         lastShard = now
         handler.postDelayed({
@@ -805,7 +777,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
                     if (line.length > 3 && visible() && CapriAccess.foreground in feeds) {
                         lastTouch = now
                         say(line)
-                        earn(Achievements.bump(this, "feed"))
                     }
                 })
             }
@@ -820,7 +791,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
             if (line.length > 3 && visible() && CapriAccess.foreground in feeds) {
                 lastTouch = now
                 say(line)
-                earn(Achievements.bump(this, "feed"))
             }
         }
     }
@@ -866,7 +836,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
             if (spikes.size >= 4 && dizzyLeft < 1f) {
                 spikes.clear()
                 dizzyLeft = 3.5f
-                earn(Achievements.bump(this, "dizzy"))
                 glitchFor = 0.3f
                 say(Lines.pick(Lines.dizzy))
             }
@@ -906,7 +875,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
 
     private fun charged() {
         if (!visible()) return
-        earn(Achievements.bump(this, "charges"))
         val c = sprites[her.clip]
         val cx = herLp.x + herLp.width / 2f
         val hy = herLp.y + herLp.height / 2f - c.h * 0.35f
@@ -1173,63 +1141,6 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         }
         bubbleLp.x = (cx - bubbleLp.width / 2f).toInt().coerceIn((left + 8 * dp).toInt(), (right - bubbleLp.width - 8 * dp).toInt())
         bubbleLp.y = (headTop - bubbleLp.height - 4 * dp).toInt().coerceAtLeast((top + 4 * dp).toInt())
-    }
-
-    // -- gifts ---------------------------------------------------------------------------------------------------
-    private fun gifts(dt: Float) {
-        val gv = gift
-        if (!prefs.game) { if (gv != null) removeGift(); return }  // the game's off: no gifts
-        if (gv == null) {
-            if (now > nextGift && (mode == Mode.IDLE || mode == Mode.PERCH)) dropGift()
-            return
-        }
-        gv.t += dt
-        if (giftVy != 0f || giftY < floor - gv.sizePx) {
-            giftVy += 2600f * k * dt
-            giftY += giftVy * dt
-            if (giftY >= floor - gv.sizePx) {
-                giftY = floor - gv.sizePx
-                giftVy = if (giftVy > 600f * k) -giftVy * 0.35f else 0f
-            }
-        }
-        giftLp.x = (giftX - gv.sizePx / 2f).toInt()
-        giftLp.y = giftY.toInt()
-        runCatching { wm.updateViewLayout(gv, giftLp) }
-        gv.invalidate()
-        if (now > giftUntil) removeGift()
-    }
-
-    private fun dropGift() {
-        nextGift = now + 60f * (8 + Random.nextFloat() * 12)
-        val g = Gift.roll()
-        val size = (34 * dp).toInt()
-        val gv = GiftView(this, g, size)
-        gv.onTap = { collect(gv) }
-        giftLp = overlayParams(size, size, touchable = true)
-        giftX = (footX + (if (her.flip) -1 else 1) * 40 * dp).coerceIn(left + size, right - size)
-        giftY = footY - sprites.h * 0.45f
-        giftVy = -500f * k
-        giftUntil = now + 180f
-        giftLp.x = (giftX - size / 2f).toInt()
-        giftLp.y = giftY.toInt()
-        wm.addView(gv, giftLp)
-        gift = gv
-        play(if (mode == Mode.PERCH) "perch_blink" else "grin")
-        say(Lines.pick(Lines.gift))
-    }
-
-    private fun collect(gv: GiftView) {
-        prefs.collect(gv.gift)
-        earn(Achievements.bump(this, "gifts") + if (gv.gift.rarity == "legendary") Achievements.bump(this, "legend") else emptyList())
-        fx.splash(giftX, giftY + gv.sizePx / 2f, intArrayOf(gv.gift.color, 0xFFFFFFFF.toInt()), 3f * dp, 22)
-        showFx()
-        say(Lines.pick(Lines.collected) + " (${gv.gift.label})")
-        removeGift()
-    }
-
-    private fun removeGift() {
-        gift?.let { runCatching { wm.removeView(it) } }
-        gift = null
     }
 
     // -- fullscreen: she steps away while you watch or play -------------------------------------------------------

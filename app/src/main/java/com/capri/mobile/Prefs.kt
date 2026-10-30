@@ -2,7 +2,7 @@ package com.capri.mobile
 
 import android.content.Context
 
-/** What you can set, plus your gift stash. */
+/** What you can set. */
 class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("capri", Context.MODE_PRIVATE)
 
@@ -30,9 +30,6 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("shake", true)
         set(v) = sp.edit().putBoolean("shake", v).apply()
 
-    var game: Boolean  // gifts and achievements
-        get() = sp.getBoolean("game", true)
-        set(v) = sp.edit().putBoolean("game", v).apply()
 
     var feed: Boolean  // scroll with me: reacts to TikTok / Reels / Shorts sometimes (needs a brain + accessibility)
         get() = sp.getBoolean("feed", true)
@@ -57,8 +54,4 @@ class Prefs(context: Context) {
     var bubbleStyle: Int  // her chat bubble: 0 = classic (dark call box), 1 = light card, 2 = dark card
         get() = sp.getInt("bubble_style", 0)
         set(v) = sp.edit().putInt("bubble_style", v).apply()
-
-    fun count(g: Gift): Int = sp.getInt("gift_" + g.name, 0)
-
-    fun collect(g: Gift) = sp.edit().putInt("gift_" + g.name, count(g) + 1).apply()
 }

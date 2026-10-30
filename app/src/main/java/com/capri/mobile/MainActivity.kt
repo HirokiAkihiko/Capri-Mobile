@@ -98,7 +98,7 @@ val MONO = SANS  // the old mono labels read cleaner in Manrope now
 /** The GitHub repo (shown on the About tab). */
 const val REPO_URL = "https://github.com/Capri-cmd/Capri-Mobile"
 
-/** The one screen: her home, her brain, your stash, setup, and the credits. */
+/** The one screen: her home, her brain, setup, and the credits. */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -116,7 +116,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Tab(val label: String, val icon: String) {
-    HOME("Home", "home"), BRAIN("Brain", "brain"), STASH("Stash", "gift"), SETUP("Setup", "gear"), ABOUT("About", "info")
+    HOME("Home", "home"), BRAIN("Brain", "brain"), SETUP("Setup", "gear"), ABOUT("About", "info")
 }
 
 @Composable
@@ -147,7 +147,6 @@ private fun App() {
                 Tab.HOME -> HomeTab(tick) { tab = it }
                 Tab.BRAIN -> BrainSection(CapriService.running, { t, b, c -> Card(t, b, content = c) },
                     { l, c, f -> NeonButton(l, c, onClick = f) })
-                Tab.STASH -> StashTab(tick)
                 Tab.SETUP -> SetupTab(tick) { tick++ }
                 Tab.ABOUT -> AboutTab()
             }
@@ -288,8 +287,6 @@ private fun HomeTab(tick: Int, go: (Tab) -> Unit) {
     val canDraw = remember(tick) { Settings.canDrawOverlays(ctx) }
     val face = remember { ctx.assets.open("face.png").use { BitmapFactory.decodeStream(it) }.asImageBitmap() }
     val brain = remember(tick) { ModelStore.active(ctx) }
-    val earned = remember(tick) { Badge.entries.count { Achievements.unlocked(ctx, it) } }
-    val gifts = remember(tick) { Gift.entries.sumOf { Prefs(ctx).count(it) } }
     val memories = remember(tick) { Memory.get(ctx).all().take(3) }
 
     Row(Modifier.fillMaxWidth().background(PANEL, RoundedCornerShape(12.dp)).border(1.dp, EDGE, RoundedCornerShape(12.dp))
@@ -323,11 +320,6 @@ private fun HomeTab(tick: Int, go: (Tab) -> Unit) {
     }
     if (!canDraw) Text("Capri needs \"display over other apps\" so she can float on your screen.", color = MUTED,
         fontFamily = SANS, fontSize = 12.sp)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Stat("Badges", "$earned/${Badge.entries.size}", Modifier.weight(1f).clickable { go(Tab.STASH) })
-        Stat("Gifts", "$gifts", Modifier.weight(1f).clickable { go(Tab.STASH) })
-        Stat("Days", "${Achievements.count(ctx, "days")}", Modifier.weight(1f))
-    }
     if (brain == null) Card("Brain", "Give her a brain and she talks back, offline, on your phone.") {
         NeonButton("Pick a brain", INK) { go(Tab.BRAIN) }
     } else Card("Talk to her", "Hold her on screen and talk, let go when you're done. Or type in the Brain tab.") {
@@ -368,56 +360,6 @@ private fun HomeTab(tick: Int, go: (Tab) -> Unit) {
 }
 
 @Composable
-private fun StashTab(tick: Int) {
-    val ctx = LocalContext.current
-    val prefs = remember { Prefs(ctx) }
-    val earned = remember(tick) { Badge.entries.count { Achievements.unlocked(ctx, it) } }
-    if (!prefs.game) Text("The game is off (Setup). Your progress is still here.", color = MUTED, fontFamily = SANS, fontSize = 13.sp)
-    Card("Achievements", "$earned of ${Badge.entries.size} unlocked") {
-        LinearProgressIndicator(progress = { earned / Badge.entries.size.toFloat() }, modifier = Modifier.fillMaxWidth().height(4.dp)
-            .clip(RoundedCornerShape(4.dp)), color = INK, trackColor = SOFT, drawStopIndicator = {})
-        for (row in Badge.entries.chunked(3)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (b in row) {
-                val got = remember(tick) { Achievements.unlocked(ctx, b) }
-                val prog = remember(tick) { Achievements.progress(ctx, b) }
-                val icon = remember(b, got) {
-                    android.graphics.Bitmap.createBitmap(144, 144, android.graphics.Bitmap.Config.ARGB_8888).also {
-                        Achievements.draw(android.graphics.Canvas(it), b, 144f, got)
-                    }.asImageBitmap()
-                }
-                Column(Modifier.weight(1f).border(1.dp, EDGE, RoundedCornerShape(10.dp)).padding(8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(icon, b.title, Modifier.size(48.dp))
-                    Text(if (got) b.title else "Locked", color = if (got) INK else MUTED, fontFamily = SANS,
-                        fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 1)
-                    Text(b.how, color = MUTED, fontFamily = SANS, fontSize = 10.5.sp, lineHeight = 13.sp, maxLines = 3, minLines = 3)
-                    if (!got && b.goal > 1) {
-                        LinearProgressIndicator(progress = { prog }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp).height(3.dp),
-                            color = PINK, trackColor = SOFT, drawStopIndicator = {})
-                        Text("${Achievements.count(ctx, b.counter)}/${b.goal}", color = MUTED, fontFamily = SANS, fontSize = 10.sp)
-                    }
-                }
-            }
-        }
-    }
-    Card("Gift stash", "What she dropped for you. ${remember(tick) { Gift.entries.sumOf { prefs.count(it) } }} collected.") {
-        for (row in Gift.entries.chunked(3)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (g in row) {
-                val n = remember(tick) { prefs.count(g) }
-                val icon = remember(g) { giftBitmap(g, 120).asImageBitmap() }
-                Column(Modifier.weight(1f).border(1.dp, EDGE, RoundedCornerShape(10.dp)).padding(8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(icon, g.label, Modifier.size(40.dp), alpha = if (n > 0) 1f else 0.25f)
-                    Text(if (n > 0) g.label else "???", color = if (n > 0) INK else MUTED, fontFamily = SANS,
-                        fontWeight = FontWeight.SemiBold, fontSize = 11.sp, maxLines = 1)
-                    Text("x$n · ${g.rarity}", color = if (g.rarity == "legendary") PINK else MUTED, fontFamily = SANS, fontSize = 10.sp)
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun SetupTab(tick: Int, refresh: () -> Unit) {
     val ctx = LocalContext.current
     val prefs = remember { Prefs(ctx) }
@@ -433,7 +375,6 @@ private fun SetupTab(tick: Int, refresh: () -> Unit) {
     var blips by remember { mutableStateOf(prefs.blips) }
     var tilt by remember { mutableStateOf(prefs.tilt) }
     var shake by remember { mutableStateOf(prefs.shake) }
-    var game by remember { mutableStateOf(prefs.game) }
     var feed by remember { mutableStateOf(prefs.feed) }
     var size by remember { mutableFloatStateOf(prefs.sizeDp.toFloat()) }
     var bubbleStyle by remember { mutableIntStateOf(prefs.bubbleStyle) }
@@ -471,7 +412,6 @@ private fun SetupTab(tick: Int, refresh: () -> Unit) {
         Toggle("Blips", "soft ticks while she types", blips) { blips = it; prefs.blips = it }
         Toggle("Tilt slide", "she slides to the low side when you tilt your phone", tilt) { tilt = it; prefs.tilt = it }
         Toggle("Shake", "shake her dizzy; a hard shake throws her", shake) { shake = it; prefs.shake = it }
-        Toggle("Game", "gifts she drops and achievements to unlock. Off: just her", game) { game = it; prefs.game = it }
         Toggle("Scroll with me", "in TikTok, Reels, Shorts, Reddit, X she reads the captions and comments and " +
             "sometimes reacts. Needs a brain + accessibility. Never stored.", feed) { feed = it; prefs.feed = it }
     }

@@ -32,7 +32,7 @@ Optional, in **Setup**: allow the mic to talk to her, and turn on Accessibility 
 
 <br>
 
-<div align="center"><img src="docs/screens.png" alt="Home, Brain and Stash screens" width="100%"></div>
+<div align="center"><img src="docs/screens.png" alt="Home and Brain screens" width="100%"></div>
 
 ## What she does
 
@@ -46,7 +46,6 @@ Optional, in **Setup**: allow the mic to talk to her, and turn on Accessibility 
 - **Scrolls with you.** In TikTok, Reels, Shorts, Reddit and X she reads the caption and sometimes drops a reaction.
 - **Notices things.** Your charger, low battery, late nights, the app you open.
 - **Gets out of the way.** Fullscreen videos and games: she steps away and comes back after.
-- **Gifts and achievements.** She drops gifts now and then, and there are 19 badges to find. Not your thing? Switch **Game** off.
 
 <div align="center"><img src="docs/moves.png" alt="Her poses" width="100%"></div>
 
@@ -68,7 +67,7 @@ Have your own model? **Add your own .gguf** in the Brain tab.
 
 ## Your stuff is safe
 
-- **Updates keep everything.** Install a new version over the old one and her brains, memories, your name, badges and settings are all still there. Nothing downloads again.
+- **Updates keep everything.** Install a new version over the old one and her brains, memories, your name and settings are all still there. Nothing downloads again.
 - **Uninstalling asks first.** Android asks if you want to keep her data, so a reinstall picks up where you left off.
 - **Backups.** Her memory, your name and settings ride along with your phone's backup. Brains are too big for that, so they download again on a new phone.
 - **Nothing leaves your phone.** No accounts, no analytics, no servers of ours. The only internet traffic is downloading the brains you pick from Hugging Face.
@@ -100,12 +99,12 @@ llama.cpp lives in `third_party/llama.cpp` (tag **b11932**, MIT). It's compiled 
 
 ```
 app/src/main/java/com/capri/mobile/
-  CapriService.kt   her: movement, touch, senses, talking, gifts, achievements
+  CapriService.kt   her: movement, touch, senses, talking
   CapriAccess.kt    accessibility: icons to sit on, the app in front, feed text
   Brain.kt          her character sheet, memory, llama.cpp calls
   ModelStore.kt     the brain catalog   ·   DownloadService.kt  resumable downloads
   Ears.kt           hold-to-talk speech recognition
-  MainActivity.kt   the app (Home / Brain / Stash / Setup / About)
+  MainActivity.kt   the app (Home / Brain / Setup / About)
 ```
 
 </details>

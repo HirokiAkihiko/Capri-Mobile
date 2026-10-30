@@ -38,9 +38,6 @@ object Lines {
     val game = listOf("Game time? Don't flatline.", "Let's play, choom.", "Win this one for me.",
         "Go get 'em, edgerunner.")
     val instagram = listOf("Insta? Post me next time.", "Scrolling the 'gram, huh?")
-    val gift = listOf("Got something for you.", "Found this. It's yours.", "Here. Don't lose it.",
-        "Little gift. Don't make it weird.")
-    val collected = listOf("Nova. Added to your stash.", "Good catch, choom.", "Yoink. It's yours.")
     val woke = listOf("Mm. I'm up, I'm up.", "Back online.", "What'd I miss?")
 
     private val last = HashMap<List<String>, String>()
