@@ -27,5 +27,11 @@ object Llama {
     external fun look(handle: Long, rgb: ByteArray, w: Int, h: Int, roles: Array<String>, contents: Array<String>,
                       maxTokens: Int, temperature: Float, piece: Piece): String
 
+    /** Loads her ears (Qwen3-ASR's audio projector) onto a [load]ed Qwen3-ASR model. */
+    external fun loadEars(handle: Long, path: String, nThreads: Int): Boolean
+
+    /** 16 kHz mono samples in, "language English<asr_text>..." out. [context]: words it should expect. */
+    external fun hear(handle: Long, pcm: FloatArray, context: String, maxTokens: Int): String
+
     external fun free(handle: Long)
 }

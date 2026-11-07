@@ -7,7 +7,7 @@ CD PROJEKT RED, CD PROJEKT S.A., Studio Trigger or R. Talsorian Games.
 
 Capri, *Cyberpunk: Edgerunners*, *Cyberpunk: Edgerunners 2* and *Cyberpunk 2077* are characters and trademarks of
 CD PROJEKT S.A. *Cyberpunk* is a trademark of R. Talsorian Games. All rights to them stay with their owners.
-This project ships **no official art, audio, logos or video**: every picture of Capri in it is the fan-made sprite art
+This project ships **no official art, audio, logos or video**: every picture of Capri in it is the fan-made art
 below. It's free, has no ads or payments, and will never be sold.
 
 ## Code
@@ -19,7 +19,8 @@ any non-commercial purpose.
 
 | What | Where | Author | License |
 |---|---|---|---|
-| Capri sprite art (all of her animations, the app icon and the nap art are cut from it) | `app/src/main/assets/sprites`, `face.png`, `nap.png` | Lachy, [github.com/lachydotmcg](https://github.com/lachydotmcg) | PolyForm Noncommercial 1.0.0, see [`app/src/main/assets/LICENSE.md`](app/src/main/assets/LICENSE.md). Required Notice: Copyright 2026 Lachy (https://github.com/lachydotmcg) |
+| Capri's art: her animations, mini form, the Watcher, the intro and the app icon | `app/src/main/assets/skins`, `eyes`, `intro`, `face.png` | xilia_world00 (Discord) | Drawn for Capri, all rights stay with the artist |
+| Sprite art used by earlier versions (in this repository's history) | git history | Lachy, [github.com/lachydotmcg](https://github.com/lachydotmcg) | PolyForm Noncommercial 1.0.0, see [`app/src/main/assets/LICENSE.md`](app/src/main/assets/LICENSE.md). Required Notice: Copyright 2026 Lachy (https://github.com/lachydotmcg) |
 | llama.cpp, ggml, mtmd (compiled into the app) | `third_party/llama.cpp` | The ggml authors | MIT, see [`app/src/main/assets/LICENSE-llama.cpp.txt`](app/src/main/assets/LICENSE-llama.cpp.txt) |
 | Share Tech Mono font | `app/src/main/res/font` | Carrois Apostrophe | SIL Open Font License 1.1, see [`app/src/main/assets/OFL-ShareTechMono.txt`](app/src/main/assets/OFL-ShareTechMono.txt) |
 | Manrope font | `app/src/main/res/font` | The Manrope Project Authors | SIL Open Font License 1.1, see [`app/src/main/assets/OFL-Manrope.txt`](app/src/main/assets/OFL-Manrope.txt) |
@@ -28,8 +29,13 @@ any non-commercial purpose.
 ## Models (not included, downloaded by the user)
 
 The app downloads models the user picks, straight from Hugging Face. They are not part of this repository and each
-keeps its own license: Qwen3.5 (Apache 2.0), MiniCPM, Gemma (Gemma terms), NVIDIA Nemotron (NVIDIA Open Model License).
+keeps its own license: Qwen3.5 and Qwen3-ASR (Apache 2.0), NVIDIA Nemotron (NVIDIA Open Model License), Conversational 7B (see its page).
 The CapriAI2 fine-tunes were trained by [ghasty3](https://github.com/ghasty3) ([Hugging Face](https://huggingface.co/Ghasty3/CapriAI2)). See each model's page.
+
+## Online services (only if you choose them)
+
+NVIDIA's API is used only with your own key, under NVIDIA's terms. GitHub's public API is asked for the latest release
+number. Neither is part of this project, and no data goes to the Capri crew.
 
 ## Takedowns
 

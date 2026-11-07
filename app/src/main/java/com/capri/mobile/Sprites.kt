@@ -7,8 +7,8 @@ import android.graphics.Color
 import android.graphics.Rect
 
 /**
- * Capri's sprite strips (assets/sprites), scaled once to her size on screen. Standing clips are 240 x 384 frames,
- * the sitting ones (perch) 384 x 384. Art by Lachy (github.com/lachydotmcg), PolyForm Noncommercial: assets/LICENSE.md.
+ * Capri's sprite strips (assets/skins/<skin>), scaled once to her size on screen. Standing clips are 240 x 384 frames,
+ * the sitting ones (perch) 384 x 384. Her art is drawn for Capri by xilia_world00 on Discord (same as the desktop app).
  */
 class Clip(val strip: Bitmap, val count: Int, val fps: Float, val seated: Boolean) {
     val w = strip.width / count
@@ -35,13 +35,14 @@ class Clip(val strip: Bitmap, val count: Int, val fps: Float, val seated: Boolea
     }
 }
 
-class Sprites(context: Context, heightPx: Int) {
+class Sprites(context: Context, heightPx: Int, skin: String = "capri") {
     private class Spec(val frames: Int, val fps: Float, val seated: Boolean = false)
 
     private val specs = mapOf(  // same timing as the desktop app
         "idle" to Spec(16, 8f), "blink" to Spec(4, 8f), "blink_glitch" to Spec(4, 8f), "grin" to Spec(16, 8f),
         "glitch" to Spec(10, 15f), "dangle" to Spec(24, 10f), "sleep" to Spec(16, 6f), "wake" to Spec(13, 15f),
-        "perch" to Spec(16, 8f, true), "perch_blink" to Spec(4, 8f, true), "perch_glitch" to Spec(10, 15f, true),
+        "mouth" to Spec(5, 12f), "perch" to Spec(16, 8f, true), "perch_blink" to Spec(4, 8f, true),
+        "perch_blink_glitch" to Spec(4, 8f, true), "perch_glitch" to Spec(10, 15f, true),
     )
     val clips: Map<String, Clip>
     val h = heightPx                    // standing height (her size x 1.11, like the desktop)
@@ -52,7 +53,7 @@ class Sprites(context: Context, heightPx: Int) {
         clips = specs.mapValues { (name, s) ->
             val fw = if (s.seated) seat else w
             val fh = if (s.seated) seat else h
-            val raw = context.assets.open("sprites/$name.png").use { BitmapFactory.decodeStream(it) }
+            val raw = context.assets.open("skins/$skin/$name.png").use { BitmapFactory.decodeStream(it) }
             val scaled = Bitmap.createScaledBitmap(raw, fw * s.frames, fh, true)
             if (scaled !== raw) raw.recycle()
             Clip(scaled, s.frames, s.fps, s.seated)
@@ -70,7 +71,7 @@ class Sprites(context: Context, heightPx: Int) {
             if (Color.alpha(idle.strip.getPixel(x, y)) > 128) { sum += x; n++ }
         }
         for (c in clips.values) {
-            if (c.seated) { c.ax = 0.30f; c.ay = 0.79f } else { c.ax = if (n > 0) sum / n / idle.w else 0.5f; c.ay = (bottom + 1f) / idle.h }
+            if (c.seated) { c.ax = 0.30f; c.ay = 0.71f } else { c.ax = if (n > 0) sum / n / idle.w else 0.5f; c.ay = (bottom + 1f) / idle.h }
         }
     }
 

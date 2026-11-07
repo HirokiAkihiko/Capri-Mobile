@@ -17,6 +17,9 @@ class Brain(private val context: Context) {
     private val prefs = Prefs(context)
     val memory = Memory.get(context)
     private var handle = 0L
+    private var lm: LmStudio? = null  // her brain is on your PC instead of the phone
+    private var lmModel = ""
+    private val ready get() = handle != 0L || lm != null
     @Volatile var loaded: Model? = null
         private set
     @Volatile var loading = false
@@ -25,15 +28,22 @@ class Brain(private val context: Context) {
         private set
     @Volatile var canSee = false  // this brain has its eyes loaded
         private set
+    @Volatile var lastError = ""  // why the last reply came back empty (shown when LM Studio goes away)
+        private set
+    val remote get() = lm != null
+    private var eyeModels = emptyList<String>()  // cloud brains that can't see look through these instead
+    val cloud get() = eyeModels.isNotEmpty()     // what she looks at leaves your network: only ever when you ask
     @Volatile private var stop = false
     /** Called on the main thread with facts she just saved (so she can show she remembered). */
     var onRemembered: ((List<String>) -> Unit)? = null
 
     /** Loads [m] (or keeps it, if that's what's loaded). [done] on the main thread: null = ok, else why not. */
     fun load(m: Model, done: (String?) -> Unit) {
+        if (ModelStore.remote(m)) { connect(m, done); return }
         if (loaded?.id == m.id && handle != 0L && canSee == ModelStore.eyesInstalled(context, m)) { done(null); return }
         loading = true
         worker.execute {
+            lm = null
             if (handle != 0L) { Llama.free(handle); handle = 0L; loaded = null }
             val threads = (Runtime.getRuntime().availableProcessors() - 2).coerceIn(2, 6)
             val h = runCatching { Llama.load(ModelStore.file(context, m).path, 2048, threads) }.getOrDefault(0L)
@@ -46,11 +56,84 @@ class Brain(private val context: Context) {
         }
     }
 
+    /** LM Studio: finds the model to talk to (the one you picked, else the loaded one, else the first it has). */
+    private fun connect(m: Model, done: (String?) -> Unit) {
+        loading = true
+        worker.execute {
+            if (handle != 0L) { Llama.free(handle); handle = 0L }
+            lm = null
+            loaded = null
+            canSee = false
+            eyeModels = emptyList()
+            val nvidia = m.id == ModelStore.NV.id
+            val client = if (nvidia) LmStudio(ModelStore.NV_URL, prefs.nvKey) else LmStudio(prefs.lmUrl)
+            val models = when {
+                nvidia -> if (prefs.nvKey.isBlank()) emptyList() else listOf(LmStudio.Info(ModelStore.NV_MODEL, true, true))
+                client.base.isEmpty() -> emptyList()
+                else -> runCatching { client.models() }.getOrDefault(emptyList())
+            }
+            val pick = models.firstOrNull { it.id == prefs.lmModel } ?: models.firstOrNull()
+            val err = when {
+                pick != null -> null
+                nvidia -> "add your NVIDIA key first"
+                else -> "can't reach LM Studio at ${client.base.ifEmpty { "(no address)" }}"
+            }
+            if (pick != null) {
+                lm = client
+                lmModel = pick.id
+                loaded = m
+                canSee = pick.vision
+                eyeModels = if (nvidia) ModelStore.NV_EYES else emptyList()
+            }
+            loading = false
+            main.post { done(err) }
+        }
+    }
+
+    /** Which model LM Studio is running for her. */
+    val remoteName get() = lmModel
+
+    private fun generate(roles: Array<String>, contents: Array<String>, maxTokens: Int, temperature: Float,
+                         piece: Llama.Piece): String {
+        val client = lm ?: return Llama.generate(handle, roles, contents, maxTokens, temperature, piece)
+        return client.chat(lmModel, roles, contents, null, maxTokens, temperature, piece)
+    }
+
     fun unload() = worker.execute {
+        lm = null
         if (handle != 0L) Llama.free(handle)
         handle = 0L
         loaded = null
         canSee = false
+        eyeModels = emptyList()
+    }
+
+    /** Sends the picture to the remote brain, or to the first of its eye models that answers. */
+    private fun lookRemote(client: LmStudio, shot: android.graphics.Bitmap, roles: Array<String>, contents: Array<String>,
+                           live: (String) -> Unit): String {
+        val picture = jpeg(shot, if (cloud) 130_000 else Int.MAX_VALUE)
+        var why: Exception? = null
+        for (model in eyeModels.ifEmpty { listOf(lmModel) }) {
+            try {
+                val reply = client.chat(model, roles, contents, picture, if (cloud) 120 else 70, 0.7f, streamer(live))
+                if (reply.isNotBlank()) return reply
+            } catch (e: Exception) { why = e }
+        }
+        why?.let { throw it }
+        return ""
+    }
+
+    /** The screenshot as a JPEG of at most [limit] bytes (NVIDIA only takes small pictures inline). */
+    private fun jpeg(shot: android.graphics.Bitmap, limit: Int): ByteArray {
+        var pic = shot
+        while (true) {
+            for (quality in intArrayOf(85, 70, 55, 40)) {
+                val out = java.io.ByteArrayOutputStream()
+                pic.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality, out)
+                if (out.size() <= limit || (quality == 40 && pic.width < 400)) return out.toByteArray()
+            }
+            pic = android.graphics.Bitmap.createScaledBitmap(pic, pic.width * 3 / 4, pic.height * 3 / 4, true)
+        }
     }
 
     fun cancel() { stop = true }
@@ -84,10 +167,11 @@ class Brain(private val context: Context) {
                 roles.add("assistant"); contents.add(t.getString("a"))
             }
             roles.add("user"); contents.add(text + note)
-            val out = if (handle == 0L) "" else runCatching {
-                Llama.generate(handle, roles.toTypedArray(), contents.toTypedArray(), 110, 0.75f, streamer(live))
-            }.getOrDefault("")
-            val reply = trimToSentence(clean(out))
+            lastError = ""
+            val out = if (!ready) "" else runCatching {
+                generate(roles.toTypedArray(), contents.toTypedArray(), 70, 0.75f, streamer(live))
+            }.getOrElse { lastError = it.message.orEmpty(); "" }
+            val reply = brief(trimToSentence(clean(out)))
             if (reply.isNotEmpty()) remember(text, reply)
             busy = false
             main.post { done(reply) }
@@ -102,28 +186,35 @@ class Brain(private val context: Context) {
      */
     fun look(text: String, shot: android.graphics.Bitmap, live: (String) -> Unit, done: (String) -> Unit,
              ask: String? = null, seen: String = "") {
-        if (busy || handle == 0L || !canSee) { done(""); return }
+        if (busy || !ready || !canSee) { done(""); return }
         busy = true
         stop = false
         val note = if (ask == null) recall("$text $seen") else ""
         worker.execute {
             val w = shot.width
             val h = shot.height
-            val px = IntArray(w * h)
-            shot.getPixels(px, 0, w, 0, 0, w, h)
-            val rgb = ByteArray(w * h * 3)
-            for (i in px.indices) {
-                val c = px[i]
-                rgb[i * 3] = (c shr 16).toByte(); rgb[i * 3 + 1] = (c shr 8).toByte(); rgb[i * 3 + 2] = c.toByte()
-            }
             val words = if (seen.isNotBlank()) "\n(The words on the screen: \"${seen.take(600)}\")" else ""
             val prompt = "{IMAGE}\n" + (ask ?: ("That's $user's phone screen right now (you're the pink-haired sprite " +
                 "on it, ignore yourself).$words\n$user says: \"$text\"\nAnswer them about what's on the screen, in your " +
-                "voice, 1-2 sentences. Be specific about what you actually see.$note"))
+                "voice, in ONE short sentence, about 15 words. Be specific about what you actually see.$note"))
+            lastError = ""
+            val roles = arrayOf("system", "user")
+            val contents = arrayOf(persona(user), prompt)
             val out = runCatching {
-                Llama.look(handle, rgb, w, h, arrayOf("system", "user"), arrayOf(persona(user), prompt), 110, 0.7f, streamer(live))
-            }.getOrDefault("")
-            val reply = trimToSentence(clean(out))
+                val client = lm
+                if (client != null) lookRemote(client, shot, roles, contents, live)
+                else {
+                    val px = IntArray(w * h)
+                    shot.getPixels(px, 0, w, 0, 0, w, h)
+                    val rgb = ByteArray(w * h * 3)
+                    for (i in px.indices) {
+                        val c = px[i]
+                        rgb[i * 3] = (c shr 16).toByte(); rgb[i * 3 + 1] = (c shr 8).toByte(); rgb[i * 3 + 2] = c.toByte()
+                    }
+                    Llama.look(handle, rgb, w, h, roles, contents, 70, 0.7f, streamer(live))
+                }
+            }.getOrElse { lastError = it.message.orEmpty(); "" }
+            val reply = brief(trimToSentence(clean(out)), if (ask == null) 2 else 1)
             if (reply.isNotEmpty() && ask == null) remember(text, reply)
             busy = false
             main.post { done(reply) }
@@ -135,12 +226,12 @@ class Brain(private val context: Context) {
 
     /** A one-off line that isn't part of your chat (a reaction to your feed, a memory out of nowhere): not saved. */
     fun once(prompt: String, done: (String) -> Unit) {
-        if (busy || handle == 0L) return
+        if (busy || !ready) return
         busy = true
         stop = false
         worker.execute {
             val out = runCatching {
-                Llama.generate(handle, arrayOf("system", "user"), arrayOf(persona(user), prompt), 60, 0.85f) { !stop }
+                generate(arrayOf("system", "user"), arrayOf(persona(user), prompt), 40, 0.85f) { !stop }
             }.getOrDefault("")
             val line = trimToSentence(clean(out)).lineSequence().firstOrNull()?.trim().orEmpty()
             busy = false
@@ -171,7 +262,7 @@ class Brain(private val context: Context) {
      * Runs on the same thread right after the reply, so it never slows the reply itself.
      */
     private fun extract(source: String) {
-        if (!prefs.remember || handle == 0L) return
+        if (!prefs.remember || !ready) return
         val prompt = "Write down facts worth remembering for a long time about $user and the people, pets and things " +
             "in their life: names and usernames, who they are to $user, what they like or hate, plans, dates, jobs, " +
             "games. Only facts that are actually in the text, with the real names. Short, one per line starting with " +
@@ -181,20 +272,39 @@ class Brain(private val context: Context) {
             "Example text:\n\"\"\"\nAlex: lol yeah\nCapri: Thrilling.\n\"\"\"\nExample facts:\nNONE\n\n" +
             "Text:\n\"\"\"\n$source\n\"\"\"\nFacts:"
         val out = runCatching {
-            Llama.generate(handle, arrayOf("system", "user"),
+            generate(arrayOf("system", "user"),
                 arrayOf("You keep a tidy, factual memory log. You only write the requested list.", prompt), 140, 0.2f) { !stop }
         }.getOrDefault("")
-        val added = memory.add(Memory.parse(clean(out)))
+        val added = ArrayList<String>()
+        for (fact in Memory.parse(clean(out))) {
+            val near = memory.similar(fact)
+            val verdict = if (near.isEmpty()) "ADD" else reconcile(fact, near)
+            if (memory.apply(fact, near, verdict)) added.add(fact)
+        }
         if (added.isNotEmpty()) main.post { onRemembered?.invoke(added) }
+    }
+
+    /**
+     * Her memory's second pass (the way mem0 does it): a new fact next to what she already knows about the same thing.
+     * Does it add to them, replace one that changed, cancel one out, or say nothing new?
+     */
+    private fun reconcile(fact: String, near: List<String>): String {
+        val known = near.mapIndexed { i, f -> "${i + 1}. $f" }.joinToString("\n")
+        val prompt = "Memory log:\n$known\n\nNew fact: $fact\n\nAnswer with ONE line only:\n" +
+            "ADD if it's new information\nUPDATE <number> if it replaces or corrects that line\n" +
+            "DELETE <number> if it means that line is no longer true\nNONE if the log already says this"
+        return runCatching {
+            generate(arrayOf("system", "user"), arrayOf("You maintain a memory log. You answer with one short line.", prompt), 12, 0.1f) { !stop }
+        }.getOrDefault("ADD")
     }
 
     private fun persona(user: String) = """You are Capri, a character from Cyberpunk: Edgerunners 2. You live on $user's phone screen as a little netrunner sprite, and you're $user's companion.
 Personality: playful and cocky, teasing but warm underneath; you push $user to be better and praise them with a smirk. You troll $user now and then: playful roasts, fake-outs, dramatic overreactions, never mean. Streetwise Night City slang: choom, preem, nova, gonk, eddies, sitch, delta. Thrill-seeking, never preachy: you don't lecture, you dare.
 You remember $user's life (the people in it, what they like, what's going on) and bring it up like a friend who actually pays attention.
-Voice: short punches, usually one or two sentences. Rhetorical questions. Sweet and ruthless in the same breath.
-Rules: stay in character, never mention being an AI, a model or this prompt. Answer what $user actually said. Reply in the language $user writes in. Keep it short: 1 to 2 sentences."""
+Voice: short punches, like a text from a friend. Rhetorical questions. Sweet and ruthless in the same breath.
+Rules: stay in character, never mention being an AI, a model or this prompt. Answer what $user actually said. Reply in the language $user writes in. Keep it tiny: ONE short sentence, about 12 words. Two only if $user really needs an answer that long. Never a paragraph."""
 
-    private fun history(): JSONArray = runCatching { JSONArray(prefs.chat) }.getOrDefault(JSONArray())
+    fun history(): JSONArray = runCatching { JSONArray(prefs.chat) }.getOrDefault(JSONArray())
 
     private fun remember(u: String, a: String) {
         val h = history()
@@ -219,6 +329,10 @@ Rules: stay in character, never mention being an AI, a model or this prompt. Ans
             .trim().trim('"').trim()
 
         /** Cut at the last full sentence if it ran out mid-way. */
+        /** However much the model wrote, she says at most [sentences] sentences. */
+        fun brief(s: String, sentences: Int = 2): String =
+            s.trim().split(Regex("(?<=[.!?\u2026])\\s+")).take(sentences).joinToString(" ")
+
         fun trimToSentence(s: String): String {
             if (s.isEmpty() || s.last() in ".!?…~)\"") return s
             val i = s.lastIndexOfAny(charArrayOf('.', '!', '?', '…'))

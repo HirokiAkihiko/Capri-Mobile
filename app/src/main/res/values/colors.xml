@@ -8,4 +8,5 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="capri_icon_bg">#FF0A0514</color>
+    <color name="capri_page">#FFFFF1F5</color>
 </resources>

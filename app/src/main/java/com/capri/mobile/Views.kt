@@ -33,10 +33,12 @@ class CapriView(context: Context, val sprites: Sprites, val margin: Int) : View(
     var flip = false // facing left
     var rot = 0f     // degrees, clockwise
     var dizzy = 0f   // seconds of stars left
+    var mouth = -1   // her talking mouth: a frame of the "mouth" clip drawn over her face, -1 = not talking
     var t = 0f
     var onTouch: ((MotionEvent) -> Boolean)? = null
 
     private val src = Rect()
+    private val mouthSrc = Rect()
     private val dst = RectF()
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val red = tinted(0xB0FF1460.toInt())
@@ -49,7 +51,7 @@ class CapriView(context: Context, val sprites: Sprites, val margin: Int) : View(
     }
 
     override fun onDraw(canvas: Canvas) {
-        val c = sprites[clip]
+        val c = sprites[if (mouth >= 0 && clip == "grin") "idle" else clip]  // talks with her mouth, not the grin
         c.src(frame.coerceIn(0, c.count - 1), src)
         canvas.save()
         canvas.translate(width / 2f, height / 2f - bob)
@@ -64,6 +66,10 @@ class CapriView(context: Context, val sprites: Sprites, val margin: Int) : View(
             dst.offset(-split, 0f)
         }
         canvas.drawBitmap(c.strip, src, dst, paint)
+        if (mouth >= 0) {
+            val m = sprites["mouth"]
+            canvas.drawBitmap(m.strip, m.src(mouth, mouthSrc), dst, paint)
+        }
         if (flash > 0.01f) {
             white.alpha = (255 * flash).toInt()
             canvas.drawBitmap(c.strip, src, dst, white)
@@ -98,14 +104,37 @@ class CapriView(context: Context, val sprites: Sprites, val margin: Int) : View(
     override fun onTouchEvent(event: MotionEvent): Boolean = onTouch?.invoke(event) ?: false
 }
 
-/** Her nap: the sleeping picture tucked in a corner, z's drifting up. Tap it and she wakes. */
+/** Small Capri. Her nap: she lies down in a corner, z's drifting up (tap it and she wakes). Her mini form: just her eyes. */
 @SuppressLint("ViewConstructor")
-class ChipView(context: Context, val widthPx: Int) : View(context) {
-    val art: Bitmap = context.assets.open("nap.png").use { BitmapFactory.decodeStream(it) }
-    val heightPx = widthPx * art.height / art.width
-    val pad = widthPx / 6  // room above for the z's
+class ChipView(context: Context, private val napWidth: Int, private val miniWidth: Int, private val skin: String = "capri") : View(context) {
+    private val nap: Bitmap = context.assets.open("skins/$skin/nap.png").use { BitmapFactory.decodeStream(it) }
+    private val looks = HashMap<String, Bitmap>()
+    var art: Bitmap = nap
+        private set
+    var mini = false
+        private set
+    var widthPx = napWidth
+        private set
+    var heightPx = napWidth * nap.height / nap.width
+        private set
+    var pad = napWidth / 6  // room above for the z's
+        private set
+    var look = "idle"  // which of her mini looks is showing
     var t = 0f
     var onTouch: ((MotionEvent) -> Boolean)? = null
+
+    private fun eyes(name: String): Bitmap = looks.getOrPut(if (skin == "watcher") "watcher" else name) {
+        context.assets.open("eyes/${if (skin == "watcher") "watcher" else name}.webp").use { BitmapFactory.decodeStream(it) }
+    }
+
+    /** Switches between her nap and her mini form. */
+    fun use(mini: Boolean) {
+        this.mini = mini
+        art = if (mini) eyes("idle") else nap
+        widthPx = if (mini) miniWidth else napWidth
+        heightPx = widthPx * art.height / art.width
+        pad = if (mini) 0 else widthPx / 6
+    }
 
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val z = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -115,6 +144,15 @@ class ChipView(context: Context, val widthPx: Int) : View(context) {
     private val dst = RectF()
 
     override fun onDraw(canvas: Canvas) {
+        if (mini) {  // she hovers and breathes (her art has room above it, so the bob stays inside the window)
+            val bob = sin(t * 1.9f) * widthPx * 0.025f
+            val squish = sin(t * 1.9f + 0.6f)
+            val w = widthPx * (1 - 0.02f * squish)
+            val h = heightPx * (1 + 0.025f * squish)
+            dst.set((widthPx - w) / 2f, heightPx - h + bob - widthPx * 0.03f, (widthPx + w) / 2f, heightPx + bob - widthPx * 0.03f)
+            canvas.drawBitmap(eyes(look), null, dst, paint)
+            return
+        }
         dst.set(0f, pad.toFloat(), widthPx.toFloat(), (pad + heightPx).toFloat())
         canvas.drawBitmap(art, null, dst, paint)
         for (i in 0 until 3) {  // three z's, each rising and fading on a loop

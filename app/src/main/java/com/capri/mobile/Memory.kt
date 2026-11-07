@@ -46,21 +46,63 @@ class Memory private constructor(context: Context) {
         return added
     }
 
-    /** The facts that matter for [about]: shared words and names count most, recent ones break ties. */
+    /** What she already knows that's about the same thing as [fact] (for her second pass, see Brain.reconcile). */
+    @Synchronized
+    fun similar(fact: String, limit: Int = 4): List<String> {
+        val w = words(fact)
+        return facts.map { it.text to overlap(w, words(it.text)) }.filter { it.second >= 0.34f }
+            .sortedByDescending { it.second }.take(limit).map { it.first }
+    }
+
+    /**
+     * Applies her verdict on [fact] against [near]: ADD, UPDATE n, DELETE n or NONE. Anything else counts as ADD (a
+     * small model's muddled answer shouldn't lose a memory). True when she learned something new.
+     */
+    @Synchronized
+    fun apply(fact: String, near: List<String>, verdict: String): Boolean {
+        val v = verdict.trim().uppercase()
+        val target = Regex("\\d+").find(v)?.value?.toIntOrNull()?.let { near.getOrNull(it - 1) }
+        return when {
+            v.startsWith("NONE") -> false
+            v.startsWith("UPDATE") && target != null -> {
+                facts.removeAll { it.text == target }
+                add(listOf(fact))
+                true
+            }
+            v.startsWith("DELETE") && target != null -> {
+                facts.removeAll { it.text == target }
+                add(listOf(fact))
+                true
+            }
+            else -> add(listOf(fact)).isNotEmpty()
+        }
+    }
+
+    /**
+     * The facts that matter for [about]: ranked with BM25 (rare words count for more than common ones, the same scoring
+     * search engines use), names on top of that, and a little for being recent or brought up lately.
+     */
     @Synchronized
     fun relevant(about: String, limit: Int = 6): List<String> {
         if (facts.isEmpty()) return emptyList()
         val q = words(about)
         val now = System.currentTimeMillis()
-        val scored = facts.map { f ->
-            val w = words(f.text)
+        val docs = facts.map { it to words(it.text) }
+        val avg = docs.map { it.second.size }.average().toFloat().coerceAtLeast(1f)
+        val n = docs.size.toFloat()
+        val idf = q.associateWith { term ->
+            val has = docs.count { term in it.second }
+            kotlin.math.ln(1f + (n - has + 0.5f) / (has + 0.5f))
+        }
+        val scored = docs.map { (f, w) ->
             val shared = q.intersect(w)
-            val names = shared.count { n -> f.text.contains(Regex("\\b${Regex.escape(n)}\\b", RegexOption.IGNORE_CASE)) &&
-                f.text.split(" ").any { it.trim(',', '.', '(', ')', '\'').equals(n, true) && it.first().isUpperCase() } }
+            val bm25 = shared.sumOf { t -> (idf.getValue(t) * 2.2f / (1f + 1.2f * (0.25f + 0.75f * w.size / avg))).toDouble() }.toFloat()
+            val names = shared.count { t -> f.text.split(" ").any { it.trim(',', '.', '(', ')', '\'').equals(t, true) && it.first().isUpperCase() } }
             val age = (now - f.t) / 86_400_000f
-            f to (shared.size * 2f + names * 3f + 1f / (1f + age))
+            val lately = (now - f.used) / 86_400_000f
+            f to (bm25 + names * 2f + 0.6f / (1f + age) + 0.2f / (1f + lately))
         }.sortedByDescending { it.second }
-        val pick = scored.filter { it.second >= 2f }.take(limit).map { it.first }
+        val pick = scored.filter { it.second >= 1.2f }.take(limit).map { it.first }
             .ifEmpty { scored.take(2).map { it.first } }  // nothing matches: her two freshest memories still ride along
         pick.forEach { it.used = now }
         return pick.map { it.text }

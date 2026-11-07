@@ -86,7 +86,7 @@ class CapriAccess : AccessibilityService() {
      * A screenshot for her eyes (Android 11+), scaled down so her brain can take it in. Only when you ask her to
      * look (or Scroll with me, when her brain has eyes); never saved.
      */
-    fun screenshot(done: (android.graphics.Bitmap?) -> Unit) {
+    fun screenshot(maxSide: Int = 768, done: (android.graphics.Bitmap?) -> Unit) {
         if (android.os.Build.VERSION.SDK_INT < 30) { done(null); return }
         takeScreenshot(android.view.Display.DEFAULT_DISPLAY, mainExecutor, object : TakeScreenshotCallback {
             override fun onSuccess(r: ScreenshotResult) {
@@ -95,7 +95,7 @@ class CapriAccess : AccessibilityService() {
                     ?.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
                 hw.close()
                 if (full == null) { done(null); return }
-                val k = 768f / maxOf(full.width, full.height)
+                val k = maxSide.toFloat() / maxOf(full.width, full.height)
                 done(if (k < 1f) android.graphics.Bitmap.createScaledBitmap(full, (full.width * k).toInt(),
                     (full.height * k).toInt(), true) else full)
             }
@@ -105,10 +105,13 @@ class CapriAccess : AccessibilityService() {
     }
 
     /**
-     * The words on screen right now (captions, comments, titles), for "Scroll with me". Only ever asked for while a
-     * feed app is open; never stored.
+     * The words on screen right now (captions, comments, messages, titles), for "React on her own" and for when you
+     * ask her to look; never stored. [sawPassword]: this screen has a password field, so she leaves it alone.
      */
+    @Volatile var sawPassword = false
+
     fun screenText(max: Int = 900): String {
+        sawPassword = false
         val root = runCatching { rootInActiveWindow }.getOrNull() ?: return ""
         val seen = LinkedHashSet<String>()
         val queue = ArrayDeque<AccessibilityNodeInfo>()
@@ -118,6 +121,7 @@ class CapriAccess : AccessibilityService() {
             val node = queue.removeFirst()
             n++
             if (!node.isVisibleToUser) continue
+            if (node.isPassword) sawPassword = true
             if (node.isPassword || node.isEditable) continue  // never what you type
             for (t in listOf(node.text, node.contentDescription)) {
                 val s = t?.toString()?.trim()?.replace(Regex("\\s+"), " ") ?: continue

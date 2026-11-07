@@ -56,6 +56,8 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         const val ACTION_BYE = "com.capri.mobile.BYE"
         const val ACTION_ASK = "com.capri.mobile.ASK"      // typed from the app: extra "text"
         const val ACTION_BRAIN = "com.capri.mobile.BRAIN"  // the chosen brain changed: (re)load it
+        const val ACTION_TYPE = "com.capri.mobile.TYPE"    // the notification's Chat button: the little type box
+        const val ACTION_MINI = "com.capri.mobile.MINI"    // Always mini was switched
         const val ACTION_MIC = "com.capri.mobile.MIC"  // mic allowed in the app: she becomes allowed to listen too
         private const val CHANNEL = "capri"
         var running = false
@@ -64,10 +66,18 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         @Volatile var lastReply = ""
         @Volatile var instance: CapriService? = null  // VoiceActivity hands what you said back through this
         @Volatile var lastEarsError = ""  // the speech recognizer's last error, shown in the app (for debugging)
+        @Volatile var chatOpen = false  // the app's Chat tab is on screen: replies show there, not in her bubble
+        @Volatile var chatLine = ""     // her reply as it's written, for the Chat tab
+        @Volatile var quietStart = false  // restarted by a setting (size, skin): no intro this time
+        @Volatile var appOpen = false   // her app is in front: taps go through her, so she never blocks its buttons
 
         /** Tell a running Capri the mic was just allowed (the app is in front, so she may add the mic to her service). */
         fun micAllowed(c: Context) {
             if (running) c.startService(Intent(c, CapriService::class.java).setAction(ACTION_MIC))
+        }
+
+        fun miniChanged(c: Context) {
+            if (running) c.startService(Intent(c, CapriService::class.java).setAction(ACTION_MINI))
         }
 
         fun brainChanged(c: Context) {
@@ -75,7 +85,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         }
     }
 
-    private enum class Mode { IDLE, PERCH, DRAG, FALL, AWAY, CHIP, PEEK, HIDDEN }
+    private enum class Mode { IDLE, PERCH, DRAG, FALL, AWAY, CHIP, PEEK, HIDDEN, INTRO }
 
     private lateinit var wm: WindowManager
     private lateinit var prefs: Prefs
@@ -84,6 +94,11 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     private lateinit var chip: ChipView
     private lateinit var fx: FxView
     private lateinit var bubble: BubbleView
+    private var intro: IntroView? = null
+    private var box: TypeBox? = null
+    private var ready = false  // her sprites are loaded and she's built
+    private var introWait = 0f
+    private val silent get() = prefs.skin == "watcher"  // the watcher just sits and watches: no bubble, no brain
     private lateinit var herLp: WindowManager.LayoutParams
     private lateinit var chipLp: WindowManager.LayoutParams
     private lateinit var fxLp: WindowManager.LayoutParams
@@ -111,6 +126,19 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     private var lastFrame = 0L
     private var paused = false
     private var chipTick = 0f
+    private var nextUpdate = 20f
+    private var always = false    // Always mini: small on purpose, she stays that way
+    private var mood = false      // mini for a while because she felt like it
+    private var moodUntil = 0f
+    private var nextMood = 120f + Random.nextFloat() * 180f
+    private val mini get() = always || mood
+    private var miniAt = 0f       // when she shrinks (after her entrance)
+    private var annoyedUntil = 0f
+    private var blinkUntil = 0f
+    private var nextBlink = 2f
+    private var glanceUntil = 0f
+    private var nextGlance = 6f
+    private var glance = "look_left"
     private var drawn = ""
     private var lastTouch = 0f  // last time you touched her (night mode naps after a while without)
 
@@ -170,6 +198,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     // her brain and ears
     private lateinit var brain: Brain
     private var ears: Ears? = null
+    private var qwen: QwenEars? = null
     private var holdingToTalk = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -182,11 +211,22 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         prefs = Prefs(this)
         measure()
-        sprites = Sprites(this, (prefs.sizeDp * dp).toInt())
+        val height = (prefs.sizeDp * dp).toInt()
+        val skin = prefs.skin
+        // decoding all her frames takes a while, and this thread is also the app's: doing it here froze the app
+        Thread({
+            val s = Sprites(this, height, skin)
+            handler.post { if (instance === this) { sprites = s; build() } }
+        }, "capri-sprites").start()
+    }
+
+    /** Her sprites are in: the rest of her. */
+    private fun build() {
         val margin = (22 * dp).toInt()
         her = CapriView(this, sprites, margin).apply { onTouch = ::touchHer }
         herLp = overlayParams(sprites.w + 2 * margin, sprites.h + 2 * margin, touchable = true)
-        chip = ChipView(this, (prefs.sizeDp * 0.42f * dp).toInt()).apply { onTouch = ::touchChip }
+        always = prefs.mini
+        chip = ChipView(this, (prefs.sizeDp * 0.9f * dp).toInt(), (prefs.sizeDp * 0.62f * dp).toInt(), prefs.skin).apply { onTouch = ::touchChip }
         chipLp = overlayParams(chip.widthPx, chip.heightPx + chip.pad, touchable = true)
         fx = FxView(this)
         fxLp = overlayParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT, false)
@@ -206,22 +246,91 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         brain = Brain(this)
         brain.onRemembered = { facts -> remembered(facts) }
         loadBrain(quiet = true)
-        // the entrance: she drops in from above the screen and lands with a splash
         footX = left + (right - left) * 0.72f
+        sense(true)
+        if (quietStart && mini) enterMini() else if (quietStart) dropIn() else startIntro()
+        quietStart = false
+        ready = true
+        startLoop()
+    }
+
+    /** Restarted by a setting while always mini: she's just there, small. */
+    private fun enterMini() {
+        fitChip()
+        placeChip()
+        showChip()
+        mode = Mode.CHIP
+    }
+
+    /** Her entrance: the fullscreen intro, ending exactly where she lands. */
+    private fun startIntro() {
+        footY = floor
+        mode = Mode.INTRO
+        intro = IntroView(this)
+    }
+
+    /** Without the intro: she drops in from above the screen and lands with a splash. */
+    private fun dropIn() {
         footY = -sprites.h * 0.2f
         mode = Mode.FALL
         her.clip = "dangle"
         showHer()
-        sense(true)
-        startLoop()
         handler.postDelayed({ greet() }, 1800)
     }
 
+    private fun stepIntro(dt: Float, v: IntroView) {
+        if (mode == Mode.INTRO && v.parent == null) {  // waiting for its frames (a moment at most)
+            introWait += dt
+            if (v.ready && v.usable) {
+                val c = sprites["idle"]
+                val dm = resources.displayMetrics
+                val full = if (Build.VERSION.SDK_INT >= 30) wm.currentWindowMetrics.bounds else Rect(0, 0, dm.widthPixels, dm.heightPixels)
+                v.aim(full.width().toFloat(), full.height().toFloat(), footX - 0.05f * prefs.sizeDp * dp, floor - 0.5f * prefs.sizeDp * dp, c.h.toFloat())
+                // "touchable": a click-through overlay can't be solid, and this is only up for a second
+                wm.addView(v, overlayParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT, true))
+            } else if (v.ready || introWait > 4f) {
+                intro = null
+                dropIn()
+            }
+            return
+        }
+        v.step(dt)
+        if (v.landed && mode == Mode.INTRO) landFromIntro()
+        if (v.done) {
+            runCatching { wm.removeView(v) }
+            v.release()
+            intro = null
+        }
+    }
+
+    /** The intro ends on her: she rebuilds right there, with a burst of her own pixels. */
+    private fun landFromIntro() {
+        miniAt = now + 2f  // always mini: long enough to see her land
+        showHer()
+        arrive()
+        glitchFor = 0.45f
+        val c = sprites["idle"]
+        val cx = footX
+        val cy = footY - c.h * 0.45f
+        fx.splash(cx, cy, sprites.palette, 3f * dp, 44)
+        fx.splash(cx, cy, intArrayOf(0xFF78FAFF.toInt(), 0xFFFFFFFF.toInt()), 2.4f * dp, 22)
+        showFx()
+        handler.postDelayed({ greet() }, 900)
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!ready) return START_STICKY
         when (intent?.action) {
             ACTION_NAP -> if (mode == Mode.CHIP) wake() else nap()
+            ACTION_MINI -> {
+                always = prefs.mini
+                if (!mini) wake()
+                else if (mode == Mode.CHIP) { hideChip(); fitChip(); placeChip(); showChip() }  // napping: up into her mini form
+                else miniAt = 0f
+            }
             ACTION_BYE -> stopSelf()
             ACTION_ASK -> intent.getStringExtra("text")?.let { think(it) }
+            ACTION_TYPE -> { wake(); openBox() }
             ACTION_BRAIN -> loadBrain(quiet = false)
             ACTION_MIC -> startForegroundNow()  // same notification, now also allowed to use the mic
         }
@@ -236,12 +345,17 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         Choreographer.getInstance().removeFrameCallback(frame)
         sense(false)
         runCatching { unregisterReceiver(events) }
-        for ((v, on) in listOf(her to herOn, chip to chipOn, fx to fxOn, bubble to bubbleOn)) if (on) runCatching { wm.removeView(v) }
+        if (ready) for ((v, on) in listOf(her to herOn, chip to chipOn, fx to fxOn, bubble to bubbleOn)) if (on) runCatching { wm.removeView(v) }
+        intro?.let { v -> runCatching { wm.removeView(v) }; v.release() }
+        closeBox()
         probe?.let { runCatching { wm.removeView(it) } }
         blips?.release()
         ears?.release()
-        brain.cancel()
-        brain.unload()
+        qwen?.release()
+        if (ready) {
+            brain.cancel()
+            brain.unload()
+        }
         brainStatus = "no brain"
         super.onDestroy()
     }
@@ -249,6 +363,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         measure()  // rotated: the floor moved
+        if (!ready) return
         footX = footX.coerceIn(left + sprites.w * 0.3f, right - sprites.w * 0.3f)
         if (mode == Mode.IDLE) footY = floor
         if (mode == Mode.PERCH) startFall()
@@ -292,27 +407,98 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
             }
             Mode.DRAG -> animate("dangle", dt, loop = true)
             Mode.FALL -> fall(dt)
-            Mode.AWAY, Mode.HIDDEN -> Unit
+            Mode.AWAY, Mode.HIDDEN, Mode.INTRO -> Unit
             Mode.CHIP -> {
                 chip.t += dt
                 chipTick += dt
-                if (chipTick > 1 / 15f) { chipTick = 0f; chip.invalidate() }  // the z's don't need 60 fps
+                if (chipTick > 1 / 15f) {  // the z's don't need 60 fps
+                    chipTick = 0f
+                    if (chip.mini) chip.look = miniLook()
+                    chip.invalidate()
+                }
             }
         }
+        if (mini && (mode == Mode.IDLE || mode == Mode.PERCH) && now >= miniAt && !holdingToTalk) nap()
+        moods()
+        intro?.let { stepIntro(dt, it) }
         glitchFor -= dt
         her.split = if (glitchFor > 0) (2f + Random.nextFloat() * 5f) * dp else her.split * exp(-dt * 12f)
         her.flash = maxOf(0f, her.flash - dt * 2.5f)
         if (fxOn && !fx.step(dt)) hideFx()
         feed()
         memoryBeat()
+        if (now > nextUpdate) {  // Wi-Fi only, and it only really asks GitHub a few times a day
+            nextUpdate = now + 1800f
+            Updates.check(this) { handler.post { if (around()) say("New update's out, choom. Check your notifications.") } }
+        }
         talk(dt)
+        mouth()
+        ghost()
         if (herOn) {
             placeHer()
             her.bob = her.bob.toInt().toFloat()  // whole pixels: an unchanged frame isn't redrawn (battery)
-            val key = "${her.clip}${her.frame}|${her.bob}|${(her.split * 2).toInt()}|${(her.flash * 50).toInt()}|" +
+            val key = "${her.clip}${her.frame}|${her.mouth}|${her.bob}|${(her.split * 2).toInt()}|${(her.flash * 50).toInt()}|" +
                 "${her.rot.toInt()}|${her.flip}|${if (dizzyLeft > 0) (now * 30).toInt() else 0}"
             if (key != drawn) { drawn = key; her.invalidate() }
         }
+    }
+
+    private var ghosted = false
+
+    /** While her own app is open taps go through her (Android wants click-through overlays at 80% or less). */
+    private fun ghost() {
+        if (appOpen == ghosted) return
+        ghosted = appOpen
+        val touch = WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        for (lp in listOf(herLp, chipLp)) {
+            lp.flags = if (ghosted) lp.flags or touch else lp.flags and touch.inv()
+            lp.alpha = if (ghosted) 0.8f else 1f
+        }
+        if (herOn) wm.updateViewLayout(her, herLp)
+        if (chipOn) wm.updateViewLayout(chip, chipLp)
+    }
+
+    /** Now and then she goes mini for a few minutes, because she feels like it. Never while you're talking to her. */
+    private fun moods() {
+        if (always) { mood = false; return }
+        val quiet = !bubbleOn && !holdingToTalk && box == null
+        if (mood) {
+            if (now > moodUntil && quiet) {
+                mood = false
+                nextMood = now + 180f + Random.nextFloat() * 420f
+                wake()
+            }
+        } else if (prefs.moods && now > nextMood && quiet && (mode == Mode.IDLE || mode == Mode.PERCH)) {
+            mood = true
+            moodUntil = now + 60f + Random.nextFloat() * 180f
+            miniAt = 0f
+        }
+    }
+
+    /** Which of her mini looks right now: thinking, talking, annoyed, or blinking and glancing around. */
+    private fun miniLook(): String {
+        val mad = now < annoyedUntil || now < grumpyUntil
+        if (bubbleOn && !bubble.done) {
+            val flap = (now * 9).toInt() % 3
+            return if (mad) (if (flap == 2) "annoyed" else "annoyed_talk") else listOf("talk", "talk2", "idle")[flap]
+        }
+        if (brain.busy) return if ((now * 5).toInt() % 3 == 0) "glitch" else "idle"
+        if (now > nextBlink) { blinkUntil = now + 0.14f; nextBlink = now + 2f + Random.nextFloat() * 4f }
+        if (now < blinkUntil) return "blink"
+        if (mad) return "annoyed"
+        if (now > nextGlance) {
+            glanceUntil = now + 0.9f + Random.nextFloat()
+            nextGlance = glanceUntil + 5f + Random.nextFloat() * 9f
+            glance = if (Random.nextBoolean()) "look_left" else "look_right"
+        }
+        return if (now < glanceUntil) glance else "idle"
+    }
+
+    /** Her mouth moves while her line is being written out (same rhythm as the desktop), over her standing frames. */
+    private fun mouth() {
+        val talking = bubbleOn && !bubble.done && mode == Mode.IDLE &&
+            (her.clip == "idle" || her.clip == "grin" || her.clip == "blink" || her.clip == "blink_glitch")
+        her.mouth = if (!talking) -1 else if ((now * 12).toInt() % 4 != 0) (now * 12 + 0.5f).toInt() % 5 else 0
     }
 
     private fun animate(name: String, dt: Float, loop: Boolean) {
@@ -525,7 +711,11 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 handler.removeCallbacks(longPress)
-                if (holdingToTalk) { holdingToTalk = false; ears?.stop() }  // let go: that's the end of what you said
+                if (holdingToTalk) {  // let go: that's the end of what you said
+                    holdingToTalk = false
+                    ears?.stop()
+                    if (qwen != null) { qwen?.stop(); say("...", hold = true) }
+                }
                 tracker?.addMovement(e)
                 if (dragging) {  // let go: she flies with the flick and falls
                     tracker?.computeCurrentVelocity(1000, 6000f * k)
@@ -567,8 +757,8 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         if (now - lastTap < 0.32f) {
             handler.removeCallbacks(singleTap)
             lastTap = -1f
-            if (mode == Mode.IDLE) play("grin") else play("perch_blink")
-            if (Random.nextFloat() < 0.6f) say(Lines.pick(Lines.doubleTap))
+            tapX = x; tapY = y
+            poke()
             return
         }
         lastTap = now
@@ -576,7 +766,38 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         handler.postDelayed(singleTap, 320)
     }
 
+    /** One tap: the little box to type to her in. Without a brain to answer it's a poke. */
     private fun singleTapNow() {
+        if (silent || ModelStore.active(this) == null) poke() else openBox()
+    }
+
+    private fun openBox() {
+        if (box != null) return
+        hush()
+        val b = TypeBox(this, dp, send = { think(it) }, close = ::closeBox)
+        val lp = overlayParams((right - left - 24 * dp).toInt(), WindowManager.LayoutParams.WRAP_CONTENT, touchable = true).apply {
+            flags = (flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()) or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+            x = (left + 12 * dp).toInt()
+            y = (top + 12 * dp).toInt()
+        }
+        wm.addView(b, lp)
+        box = b
+        b.open()
+    }
+
+    private fun closeBox() {
+        box?.let { runCatching { wm.removeView(it) } }
+        box = null
+    }
+
+    private fun poke() {
+        if (mode == Mode.CHIP) {  // mini: she glares
+            annoyedUntil = now + 2.5f
+            if (Random.nextFloat() < 0.7f) say(Lines.pick(Lines.headPoke))
+            return
+        }
         val c = sprites[her.clip]
         val spriteTop = her.height / 2f - c.h / 2f - her.bob
         her.flip = tapX < her.width / 2f  // she turns to the side you poked
@@ -593,28 +814,52 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
 
     private fun touchChip(e: MotionEvent): Boolean {
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> { downX = e.rawX; downY = e.rawY; grabX = e.rawX - chipLp.x; grabY = e.rawY - chipLp.y }
-            MotionEvent.ACTION_MOVE -> if (hypot(e.rawX - downX, e.rawY - downY) > slop) {  // slide the chip anywhere
+            MotionEvent.ACTION_DOWN -> {
+                downX = e.rawX; downY = e.rawY; grabX = e.rawX - chipLp.x; grabY = e.rawY - chipLp.y
+                dragging = false
+                longPressed = false
+                lastTouch = now
+                if (chip.mini) handler.postDelayed(longPress, 550)
+            }
+            MotionEvent.ACTION_MOVE -> if (!longPressed && (dragging || hypot(e.rawX - downX, e.rawY - downY) > slop)) {  // slide the chip anywhere
+                handler.removeCallbacks(longPress)
+                dragging = true
                 chipLp.x = (e.rawX - grabX).toInt()
                 chipLp.y = (e.rawY - grabY).toInt()
                 wm.updateViewLayout(chip, chipLp)
             }
-            MotionEvent.ACTION_UP -> if (hypot(e.rawX - downX, e.rawY - downY) <= slop) { lastTouch = now; wake() }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                handler.removeCallbacks(longPress)
+                if (holdingToTalk) {  // let go: that's the end of what you said
+                    holdingToTalk = false
+                    ears?.stop()
+                    if (qwen != null) { qwen?.stop(); say("...", hold = true) }
+                } else if (dragging) {
+                    if (chip.mini) { prefs.miniX = chipLp.x; prefs.miniY = chipLp.y }
+                } else if (e.actionMasked == MotionEvent.ACTION_UP && !longPressed) {
+                    lastTouch = now
+                    if (chip.mini) tap(e.x, e.y) else wake()
+                }
+                dragging = false
+            }
         }
         return true
     }
 
     // -- her brain and ears ---------------------------------------------------------------------------------------
     private fun loadBrain(quiet: Boolean) {
+        if (silent) { brain.unload(); brainStatus = "the watcher doesn't talk"; return }
         val m = ModelStore.active(this)
         if (m == null) { brain.unload(); brainStatus = "no brain"; return }
-        if (brain.loaded?.id == m.id && brain.canSee == ModelStore.eyesInstalled(this, m)) return
-        brainStatus = "loading ${m.label}..."
+        val lm = ModelStore.remote(m)
+        if (!lm && brain.loaded?.id == m.id && brain.canSee == ModelStore.eyesInstalled(this, m)) return
+        brainStatus = if (lm) "connecting to ${m.label}..." else "loading ${m.label}..."
         if (!quiet) say("Swapping my brain... hold on, choom.")
         brain.load(m) { err ->
-            brainStatus = if (err == null) "${m.label} online" + (if (brain.canSee) " + eyes" else "")
-            else "couldn't load ${m.label}: $err"
-            if (err != null) say("Brain glitch. That one won't boot on this phone.")
+            val name = if (m.id == ModelStore.LM.id) "LM Studio: ${brain.remoteName}" else m.label
+            brainStatus = if (err == null) "$name online" + (if (brain.canSee) " + eyes" else "")
+            else if (lm) err else "couldn't load ${m.label}: $err"
+            if (err != null) say(if (lm) "Can't reach my brain, choom: $err." else "Brain glitch. That one won't boot on this phone.")
             else if (!quiet) say("Brain online. Hold me and talk.")
         }
     }
@@ -622,6 +867,17 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     private fun listen() {
         if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             say("Let me hear you first: allow the mic in my app.")
+            return
+        }
+        if (ModelStore.earsReady(this)) {  // her own ears, same as the desktop
+            val q = qwen ?: QwenEars(this, heard = { think(it) }, failed = { why ->
+                holdingToTalk = false
+                say(if (why == "mic") "I can't hear you: allow the mic in my app." else "Didn't catch that, choom.")
+            }).also { qwen = it }
+            holdingToTalk = true
+            say("listening...", hold = true)
+            play(if (mode == Mode.PERCH) "perch_blink" else "blink")
+            q.start()
             return
         }
         val e = ears ?: Ears(this, heard = { think(it) }, level = { }, failed = { why ->
@@ -690,12 +946,12 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         hush()
         handler.postDelayed({
             val seen = access.screenText(900)  // names, usernames, messages: read exactly, and remembered
-            access.screenshot { shot ->
+            access.screenshot(if (brain.remote) 1280 else 768) { shot ->  // a PC's brain can take in a sharper picture
                 if (shot == null) { say("Couldn't grab your screen, choom.", you = text); return@screenshot }
                 say("*looking*", you = text, hold = true)
                 brain.look(text, shot, seen = seen, live = { say(it, you = text, hold = true, live = true) }, done = { reply ->
                     lastReply = reply
-                    say(reply.ifEmpty { "My optics glitched. Try again?" }, you = text)
+                    say(reply.ifEmpty { failed("My optics glitched. Try again?") }, you = text)
                 })
             }
         }, 250)  // a beat for her bubble to leave the shot
@@ -707,7 +963,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         if (Regex("\\b(go to sleep|take a nap|nap time|go nap)\\b", RegexOption.IGNORE_CASE).containsMatchIn(text)) {
             say("Fine. Wake me when it's fun."); handler.postDelayed({ nap() }, 1500); return
         }
-        if (mode == Mode.CHIP) wake()
+        wake()
         if (brain.loaded == null) {
             say(if (brain.loading) "Still booting my brain, choom. Give me a sec." else "I've got no brain yet. Grab one in my app.")
             return
@@ -717,9 +973,15 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         say("...", you = text, hold = true)
         brain.ask(text, live = { say(it, you = text, hold = true, live = true) }) { reply ->
             lastReply = reply
-            say(reply.ifEmpty { "My brain fizzled. Say that again?" }, you = text)
+            say(reply.ifEmpty { failed("My brain fizzled. Say that again?") }, you = text)
         }
     }
+
+    /** What she says when a reply came back empty. */
+    private fun failed(line: String) = if (brain.remote && brain.lastError.isNotEmpty()) {
+        brainStatus = "my brain stopped answering: ${brain.lastError}"
+        "My brain stopped answering, choom: ${brain.lastError.take(60)}."
+    } else line
 
     // -- scroll with me: she watches your feed and sometimes has something to say -------------------------------
     private val feeds = mapOf(
@@ -733,10 +995,10 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
 
     /** She just wrote something down: now and then she lets you know (that's the "she actually remembers" moment). */
     private fun remembered(facts: List<String>) {
-        if (now - lastShard < 120f || !visible()) return
+        if (now - lastShard < 120f || !around()) return
         lastShard = now
         handler.postDelayed({
-            if (!bubbleOn && visible()) {
+            if (!bubbleOn && around()) {
                 lastTouch = now
                 say("[memory shard] " + facts.first())
                 her.flash = 0.4f
@@ -746,53 +1008,72 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
 
     /** Every so often she remembers something about your life out of nowhere and brings it up (or trolls you with it). */
     private fun memoryBeat() {
-        if (now < nextMemory || !visible() || bubbleOn || brain.loaded == null || brain.busy || !prefs.remember) return
+        if (now < nextMemory || !around() || bubbleOn || brain.loaded == null || brain.busy || !prefs.remember) return
         nextMemory = now + 600f + Random.nextFloat() * 900f
         if (Random.nextFloat() < 0.4f) return  // not every time: it should feel like her, not a timer
         val fact = brain.memory.callback() ?: return
         val user = prefs.userName.ifBlank { "your choom" }
         brain.once("Out of nowhere you remember this about $user's life: \"$fact\". Bring it up in ONE short line, " +
-            "like a friend who remembers: ask about it, tease them about it, or troll them a little. Max 18 words.") { line ->
-            if (line.length > 3 && visible() && !bubbleOn) { lastTouch = now; say(line) }
+            "like a friend who remembers: ask about it, tease them about it, or troll them a little. Max 12 words.") { line ->
+            if (line.length > 3 && around() && !bubbleOn) { lastTouch = now; say(line) }
         }
     }
 
     private var nextFeed = 0f
     private var lastFeedText = ""
 
+    /** Apps she never looks at by herself: money, passwords, the phone's own screens. */
+    private val PRIVATE = Regex("(?i)bank|wallet|paypal|venmo|cash|revolut|finance|chase|wellsfargo|citi|barclays|hsbc|" +
+        "coinbase|binance|crypto|metamask|authenticator|authy|password|bitwarden|1password|lastpass|keepass|dashlane|" +
+        "settings|packageinstaller|permissioncontroller|systemui|inputmethod|launcher|com\\.capri\\.mobile")
+    private val homeApp by lazy {
+        packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)?.activityInfo?.packageName.orEmpty()
+    }
+
+    private fun appName(pkg: String) = runCatching {
+        packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+    }.getOrDefault("")
+
+    /**
+     * React on her own: every minute or two she glances at the app you're in and says one short thing. She looks at
+     * the picture if the brain can do it cheaply, and otherwise reads the words. Nothing from here is remembered.
+     */
     private fun feed() {
-        if (!prefs.feed || now < nextFeed || !visible() || bubbleOn) return
-        val app = feeds[CapriAccess.foreground] ?: return
-        nextFeed = now + 70f + Random.nextFloat() * 150f  // every few minutes at most, and not every time
-        if (brain.loaded == null || brain.busy || Random.nextFloat() < 0.35f) return
+        if (!prefs.feed || now < nextFeed || !around() || bubbleOn || box != null || holdingToTalk) return
+        val pkg = CapriAccess.foreground
+        val app = feeds[pkg] ?: appName(pkg)
+        if (pkg.isEmpty() || pkg == homeApp || PRIVATE.containsMatchIn(pkg) || PRIVATE.containsMatchIn(app)) return
+        nextFeed = now + 40f + Random.nextFloat() * 70f
+        if (brain.loaded == null || brain.busy || Random.nextFloat() < 0.15f) return
+        val cloudOk = !brain.cloud || prefs.cloudGlance  // your chats only go to NVIDIA by themselves if you said so
+        if (!cloudOk && pkg !in feeds) return
         val access = CapriAccess.instance ?: return
         val text = access.screenText()
-        if (text.length < 40 && brain.canSee && Build.VERSION.SDK_INT >= 30) {  // no caption to read: she watches the frame
-            val user = prefs.userName.ifBlank { "your choom" }
-            access.screenshot { shot ->
-                if (shot == null || brain.busy) return@screenshot
-                brain.look("", shot, live = {}, ask = "You and $user are doomscrolling $app together; that's the video " +
-                    "on screen (ignore the pink-haired sprite, that's you). React to it in ONE short line, like a friend " +
-                    "watching along: a joke, a hot take or a roast. Don't describe the screen. Max 15 words.", done = { line ->
-                    if (line.length > 3 && visible() && CapriAccess.foreground in feeds) {
-                        lastTouch = now
-                        say(line)
-                    }
-                })
-            }
-            return
-        }
-        if (text.length < 40 || text == lastFeedText) return
+        if (access.sawPassword || (text.length >= 40 && text == lastFeedText)) return
         lastFeedText = text
         val user = prefs.userName.ifBlank { "your choom" }
-        brain.once("You and $user are doomscrolling $app together right now. On the screen: \"$text\"\n" +
-            "React to it in ONE short line, like a friend watching along: a joke, a hot take, or a roast of what's on " +
-            "screen or the comments. Don't describe the screen, don't mention apps, screens or text. Max 15 words.") { line ->
-            if (line.length > 3 && visible() && CapriAccess.foreground in feeds) {
+        val where = if (app.isEmpty()) "on their phone" else "in $app"
+        val how = "React in ONE short line, like a friend looking over their shoulder: a joke, a hot take or a roast. " +
+            "Don't describe the screen, don't mention apps, screens or text. Max 10 words."
+        val done = { line: String ->
+            if (line.length > 3 && around() && !bubbleOn && CapriAccess.foreground == pkg) {
                 lastTouch = now
                 say(line)
             }
         }
+        // an on-phone brain takes a while over a picture, so it reads the words whenever there are any
+        if (brain.canSee && cloudOk && Build.VERSION.SDK_INT >= 30 && (brain.remote || text.length < 40)) {
+            if (!brain.remote) nextFeed += 120f
+            val words = if (text.length >= 40) " The words on it: \"$text\"." else ""
+            access.screenshot(if (brain.remote) 1280 else 768) { shot ->
+                if (shot == null || brain.busy) return@screenshot
+                brain.look("", shot, live = {}, done = done, ask = "You and $user are hanging out $where; that's their " +
+                    "screen right now (the pink-haired sprite or the green eyes are you, ignore them).$words $how")
+            }
+            return
+        }
+        if (text.length < 40) return
+        brain.once("You and $user are hanging out $where. On the screen: \"$text\"\n$how", done)
     }
 
     // -- senses: motion ------------------------------------------------------------------------------------------
@@ -850,7 +1131,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
                 Intent.ACTION_SCREEN_ON -> { paused = false; startLoop(); if (mode != Mode.CHIP) sense(true) }
                 Intent.ACTION_USER_PRESENT -> handler.postDelayed({ greet() }, 700)
                 Intent.ACTION_POWER_CONNECTED -> charged()
-                Intent.ACTION_POWER_DISCONNECTED -> if (visible() && Random.nextFloat() < 0.5f) say(Lines.pick(Lines.unplugged))
+                Intent.ACTION_POWER_DISCONNECTED -> if (around() && Random.nextFloat() < 0.5f) say(Lines.pick(Lines.unplugged))
                 Intent.ACTION_BATTERY_CHANGED -> {
                     val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
                     val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
@@ -861,7 +1142,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
                         napLowDone = true
                         say(Lines.pick(Lines.napLow))
                         handler.postDelayed({ nap() }, 2600)
-                    } else if (battery <= 20 && !plugged && !lowSaid && visible()) {
+                    } else if (battery <= 20 && !plugged && !lowSaid && around()) {
                         lowSaid = true
                         say(Lines.pick(Lines.lowBattery))
                     }
@@ -872,9 +1153,10 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     }
 
     private fun visible() = mode == Mode.IDLE || mode == Mode.PERCH || mode == Mode.PEEK
+    private fun around() = visible() || (mode == Mode.CHIP && mini && chipOn)  // somewhere she can talk from, mini included
 
     private fun charged() {
-        if (!visible()) return
+        if (!around()) return
         val c = sprites[her.clip]
         val cx = herLp.x + herLp.width / 2f
         val hy = herLp.y + herLp.height / 2f - c.h * 0.35f
@@ -890,8 +1172,8 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     private fun greet() {
         if (now - lastGreet < 900f) return
         lastGreet = now
-        if (mode == Mode.CHIP) { say(Lines.pick(Lines.sleepy)); return }
-        if (!visible()) return
+        if (mode == Mode.CHIP && !mini) { say(Lines.pick(Lines.sleepy)); return }
+        if (!around()) return
         val h = hour()
         say(Lines.pick(when (h) {
             in 0..4 -> if (Random.nextBoolean()) Lines.lateNight else Lines.night
@@ -907,7 +1189,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     }
 
     private fun react(pkg: String) {
-        if (!visible() || now - lastAppLine < 60f || now - (appLines[pkg] ?: -9999f) < 600f) return
+        if (!around() || now - lastAppLine < 60f || now - (appLines[pkg] ?: -9999f) < 600f) return
         val lines = when (pkg) {
             "com.zhiliaoapp.musically", "com.ss.android.ugc.trill", "com.ss.android.ugc.aweme" -> Lines.tiktok
             "com.google.android.youtube", "app.revanced.android.youtube" -> Lines.youtube
@@ -1013,6 +1295,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
             footY = peekY + c.h * 0.35f
             her.rot = 0f
         }
+        fitChip()
         placeChip()
         val step = (5 * dp).toInt().coerceAtLeast(2)
         val art = chip.art
@@ -1032,7 +1315,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     }
 
     fun wake() {
-        if (mode != Mode.CHIP) return
+        if (mode != Mode.CHIP || mini) return
         mode = Mode.AWAY
         val art = chip.art
         val sx = chip.widthPx.toFloat() / art.width
@@ -1091,8 +1374,10 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
      * thinking). [live]: the same reply grown longer, so the letters already typed stay typed.
      */
     private fun say(text: String, you: String = "", hold: Boolean = false, live: Boolean = false) {
+        if (silent) return
         val asked = hold || you.isNotEmpty() || now - lastTouch < 3f  // answers to you show even with Talk off
         if (!prefs.talk && !asked) return
+        if (chatOpen && you.isNotEmpty()) { chatLine = text; return }  // you're talking to her in the app
         talkOverChip = mode == Mode.CHIP
         talkText = text
         bubble.style = prefs.bubbleStyle
@@ -1156,6 +1441,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     }
 
     private fun onFullscreen(full: Boolean) {
+        if (mode == Mode.INTRO) return
         if (full && (visible() || mode == Mode.FALL)) {
             hiddenFrom = Mode.IDLE
             hush()
@@ -1213,9 +1499,19 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         herOn = false
     }
 
+    /** The chip window, sized for what she is now: mini or napping. */
+    private fun fitChip() {
+        chip.use(mini)
+        chipLp.width = chip.widthPx
+        chipLp.height = chip.heightPx + chip.pad
+    }
+
     private fun placeChip() {
-        chipLp.x = (right - chip.widthPx - 12 * dp).toInt()
-        chipLp.y = (floor - chip.heightPx - chip.pad - 4 * dp).toInt()
+        val maxX = (right - chip.widthPx).toInt()
+        val maxY = (floor - chip.heightPx - chip.pad).toInt()
+        val saved = mini && prefs.miniX >= 0
+        chipLp.x = (if (saved) prefs.miniX else (right - chip.widthPx - 12 * dp).toInt()).coerceIn(left.toInt(), maxX)
+        chipLp.y = (if (saved) prefs.miniY else (floor - chip.heightPx - chip.pad - 4 * dp).toInt()).coerceIn(top.toInt(), maxY)
     }
 
     private fun showChip() {
@@ -1274,13 +1570,15 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), flags)
         val nap = PendingIntent.getService(this, 1, Intent(this, CapriService::class.java).setAction(ACTION_NAP), flags)
+        val chat = PendingIntent.getService(this, 3, Intent(this, CapriService::class.java).setAction(ACTION_TYPE), flags)
         val bye = PendingIntent.getService(this, 2, Intent(this, CapriService::class.java).setAction(ACTION_BYE), flags)
         val n: Notification = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_capri_stat)
             .setContentTitle("Capri is jacked in")
-            .setContentText("Poke her. Shake her. Hold her to nap.")
+            .setContentText("Tap her to type. Hold her to talk.")
             .setOngoing(true)
             .setContentIntent(open)
+            .addAction(0, "Chat", chat)
             .addAction(0, "Nap / wake", nap)
             .addAction(0, "Jack out", bye)
             .build()

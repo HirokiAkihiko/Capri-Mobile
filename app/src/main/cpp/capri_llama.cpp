@@ -357,6 +357,94 @@ Java_com_capri_mobile_Llama_look(JNIEnv * env, jobject, jlong handle, jbyteArray
     return to_java(env, reply);
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_capri_mobile_Llama_loadEars(JNIEnv * env, jobject, jlong handle, jstring jpath, jint n_threads) {
+    auto * b = (Brain *) handle;
+    if (!b) return JNI_FALSE;
+    if (b->eyes) { mtmd_free(b->eyes); b->eyes = nullptr; }
+    auto p = mtmd_context_params_default();
+    p.use_gpu = false;
+    p.n_threads = n_threads;
+    p.print_timings = false;
+    p.warmup = false;
+    std::string path = from_java(env, jpath);
+    b->eyes = mtmd_init_from_file(path.c_str(), b->model, p);
+    if (!b->eyes || !mtmd_support_audio(b->eyes)) {
+        if (b->eyes) mtmd_free(b->eyes);
+        b->eyes = nullptr;
+        g_error = "those ears don't fit this model";
+        return JNI_FALSE;
+    }
+    LOGI("ears loaded: %s", path.c_str());
+    return JNI_TRUE;
+}
+
+// Qwen3-ASR: 16 kHz mono float samples in, "language English<asr_text>..." out. [context] are words it should expect.
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_capri_mobile_Llama_hear(JNIEnv * env, jobject, jlong handle, jfloatArray jpcm, jstring jcontext, jint max_tokens) {
+    auto * b = (Brain *) handle;
+    if (!b || !b->eyes) return to_java(env, "");
+
+    common_chat_templates_inputs in;
+    common_chat_msg sys;
+    sys.role = "system";
+    sys.content = from_java(env, jcontext);
+    in.messages.push_back(sys);
+    common_chat_msg user;
+    user.role = "user";
+    user.content = mtmd_default_marker();
+    in.messages.push_back(user);
+    in.add_generation_prompt = true;
+    in.use_jinja = true;
+    in.enable_thinking = false;
+    std::string prompt;
+    try {
+        prompt = common_chat_templates_apply(b->tmpls.get(), in).prompt.str();
+    } catch (const std::exception & e) {
+        g_error = std::string("chat template: ") + e.what();
+        return to_java(env, "");
+    }
+
+    jsize len = env->GetArrayLength(jpcm);
+    std::vector<float> pcm((size_t) len);
+    env->GetFloatArrayRegion(jpcm, 0, len, pcm.data());
+    mtmd_bitmap * bmp = mtmd_bitmap_init_from_audio((size_t) len, pcm.data());
+    mtmd_input_chunks * chunks = mtmd_input_chunks_init();
+    mtmd_input_text text{prompt.c_str(), prompt.size(), true, true};
+    const mtmd_bitmap * bmps[] = {bmp};
+    int32_t res = mtmd_tokenize(b->eyes, chunks, &text, bmps, 1);
+    mtmd_bitmap_free(bmp);
+    if (res != 0) {
+        mtmd_input_chunks_free(chunks);
+        g_error = "couldn't read the audio";
+        return to_java(env, "");
+    }
+    llama_memory_clear(llama_get_memory(b->ctx), true);
+    b->cached.clear();
+    llama_pos n_past = 0;
+    if (mtmd_helper_eval_chunks(b->eyes, b->ctx, chunks, 0, 0, b->n_batch, true, &n_past) != 0) {
+        mtmd_input_chunks_free(chunks);
+        llama_memory_clear(llama_get_memory(b->ctx), true);
+        g_error = "couldn't hear it (out of memory?)";
+        return to_java(env, "");
+    }
+    mtmd_input_chunks_free(chunks);
+
+    auto * smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
+    std::string reply;
+    for (int i = 0; i < max_tokens; i++) {
+        llama_token t = llama_sampler_sample(smpl, b->ctx, -1);
+        if (llama_vocab_is_eog(b->vocab, t)) break;
+        reply += common_token_to_piece(b->vocab, t, false);
+        if (llama_decode(b->ctx, llama_batch_get_one(&t, 1)) != 0) break;
+    }
+    llama_sampler_free(smpl);
+    llama_memory_clear(llama_get_memory(b->ctx), true);
+    b->cached.clear();
+    return to_java(env, reply);
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_capri_mobile_Llama_free(JNIEnv *, jobject, jlong handle) {
     auto * b = (Brain *) handle;

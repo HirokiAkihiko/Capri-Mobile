@@ -38,6 +38,7 @@ class DownloadService : Service() {
     }
 
     @Volatile private var cancel = false
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private var worker: Thread? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -109,7 +110,9 @@ class DownloadService : Service() {
         val ok = part.length() == m.bytes
         if (ok) {
             part.renameTo(m.file)
-            if (!m.eyes && ModelStore.active(this) == null) Prefs(this).brain = m.model.id  // the first brain becomes hers
+            val ears = m.model.id == ModelStore.ASR.id
+            if (!ears && !m.eyes && ModelStore.active(this) == null) Prefs(this).brain = m.model.id  // the first brain becomes hers
+            if (ears && !m.eyes) handler.post { start(this, m.model, eyes = true) }  // her ears are two files
         }
         state.value = State(if (ok) "" else m.id, part.length(), m.bytes, 0,
             if (ok) "" else if (cancel) "paused" else err.ifEmpty { "stopped" })
