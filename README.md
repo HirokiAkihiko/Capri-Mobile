@@ -35,6 +35,16 @@ Optional, in **Setup**: allow the mic to talk to her, and turn on Accessibility 
 
 <div align="center"><img src="docs/screens.png" alt="Home, Chat, Brain and Setup screens" width="100%"></div>
 
+## See her move
+
+<table>
+<tr>
+<td align="center" valign="top" width="34%"><img src="docs/intro.gif" alt="Her full-screen intro" width="100%"><br><b>A big entrance</b><br><sub>she fills your screen, then lands</sub></td>
+<td align="center" valign="top" width="33%"><img src="docs/react.gif" alt="Illustration of Capri reacting to a feed, then going mini" width="100%"><br><b>Reacts on her own</b><br><sub>one short line, then back to lurking</sub></td>
+<td align="center" valign="top" width="33%"><img src="docs/mini.gif" alt="Her mini form blinking, talking and getting annoyed" width="100%"><br><b>Mini form</b><br><sub>just her eyes, anywhere you drag them</sub></td>
+</tr>
+</table>
+
 ## What she does
 
 - **A big entrance.** The same intro as the desktop: it fills your screen, shrinks onto her spot and she bursts out of it.
@@ -52,7 +62,7 @@ Optional, in **Setup**: allow the mic to talk to her, and turn on Accessibility 
 - **Your look, your theme.** A clean light theme or a dark one, and a secret look to find.
 - **Gets out of the way.** Fullscreen videos and games: she steps away and comes back after.
 
-<div align="center"><img src="docs/moves.png" alt="Her poses" width="100%"></div>
+<div align="center"><img src="docs/moves.gif" alt="Capri idling, talking, being thrown and sitting on an app icon" width="100%"></div>
 
 <div align="center"><img src="docs/bubbles.png" alt="Chat bubble styles" width="100%"></div>
 
