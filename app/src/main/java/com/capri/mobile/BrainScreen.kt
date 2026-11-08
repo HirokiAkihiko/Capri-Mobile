@@ -151,7 +151,8 @@ private fun PhoneBrains(prefs: Prefs) {
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     when {
-                        inUse -> Pill("In use", GREEN)
+                        inUse && m.minRamGb <= ram -> Pill("In use", GREEN)
+                        m.minRamGb > ram -> Pill("Too big for this phone", PINK)
                         have -> CapriButton("Use", color = GREEN) { prefs.brain = m.id; CapriService.brainChanged(ctx); tick++ }
                         busy -> CapriButton("Pause", quiet = true) { DownloadService.cancel(ctx) }
                         else -> CapriButton(if (partial > 0) "Resume" else "Download") { DownloadService.start(ctx, m) }
@@ -269,48 +270,80 @@ private fun LmStudioCard(prefs: Prefs) {
     }
 }
 
-/** NVIDIA's cloud: a huge model for free, with a key you make yourself on their site. */
+/** NVIDIA's cloud: a huge model for free, with a key you make yourself on their site. As few steps as possible. */
 @Composable
 private fun NvidiaCard(prefs: Prefs) {
     val ctx = LocalContext.current
     val uri = androidx.compose.ui.platform.LocalUriHandler.current
     var key by remember { mutableStateOf(prefs.nvKey) }
     var note by remember { mutableStateOf("") }
+    var good by remember { mutableStateOf(false) }
     var working by remember { mutableStateOf(false) }
     var using by remember { mutableStateOf(prefs.brain == ModelStore.NV.id) }
-    Card("Nemotron Ultra 550B", "A huge model in NVIDIA's cloud, free with your own key. It needs internet, and what you say to her goes to NVIDIA. " +
-        "She sees through NVIDIA's vision model on the same key, with nothing to download.") {
-        val steps = listOf("Open NVIDIA's page and make a free account.", "Tap \"Get API Key\" there and copy it.", "Paste it here.")
+
+    fun tidy(k: String) = k.trim().removePrefix("Bearer ").trim().trim('"', '\'', '`').replace(Regex("\\s"), "")
+
+    fun check(k: String) {
+        val clean = tidy(k)
+        key = clean
+        prefs.nvKey = clean
+        good = false
+        if (clean.isEmpty()) { note = ""; return }
+        if (!clean.startsWith("nvapi-")) { note = "That isn't an NVIDIA key. A key starts with nvapi- (copy it with the Copy button on NVIDIA's page)."; return }
+        working = true
+        note = "Checking your key..."
+        thread(name = "capri-nv") {
+            val (ok, msg) = LmStudio.checkNvidia(clean)
+            note = msg
+            good = ok
+            working = false
+            if (ok) {  // it works: switch her over right away
+                prefs.brain = ModelStore.NV.id
+                using = true
+                CapriService.brainChanged(ctx)
+            }
+        }
+    }
+
+    Card("NVIDIA cloud brain", "A huge model in NVIDIA's cloud, free with your own key. Needs internet. What you say to her goes to NVIDIA, " +
+        "and so does your screen when you ask her to look. She sees through NVIDIA's vision model on the same key.") {
+        val steps = listOf(
+            "Tap Open NVIDIA. Sign in, or make a free account (NVIDIA may ask you to verify your email or phone number).",
+            "On that page tap Get API Key, then Generate Key.",
+            "Tap Copy. The key starts with nvapi-",
+            "Come back here and tap Paste key. She checks it and switches to NVIDIA by herself.",
+        )
         steps.forEachIndexed { i, s ->
             Row {
                 Text("${i + 1}", color = PINK, fontFamily = SANS, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, modifier = Modifier.width(18.dp))
                 Text(s, color = MUTED, fontFamily = SANS, fontSize = 13.sp, lineHeight = 18.sp)
             }
         }
-        CapriButton("Get my free key", Modifier.fillMaxWidth(), quiet = true) { uri.openUri(ModelStore.NV_KEY_PAGE) }
-        OutlinedTextField(key, { key = it.trim(); prefs.nvKey = key; note = "" }, label = { Text("API key, starts with nvapi-") }, singleLine = true,
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CapriButton("Open NVIDIA", Modifier.weight(1f), quiet = true) { uri.openUri(ModelStore.NV_KEY_PAGE) }
+            CapriButton("Paste key", Modifier.weight(1f), color = GREEN, enabled = !working) {
+                val clip = ctx.getSystemService(android.content.ClipboardManager::class.java)
+                val text = clip?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty()
+                if (text.isBlank()) note = "Nothing copied yet. On NVIDIA's page tap Copy next to your key, then come back."
+                else check(text)
+            }
+        }
+        OutlinedTextField(key, { key = it; prefs.nvKey = tidy(it); note = ""; good = false }, label = { Text("or type it here: nvapi-...") }, singleLine = true,
             visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
             colors = capriField(), shape = chamfer(9.dp), modifier = Modifier.fillMaxWidth())
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CapriButton("Test key", Modifier.weight(1f), quiet = true, enabled = !working && key.isNotBlank()) {
-                working = true
-                note = "Testing..."
-                thread(name = "capri-nv") {
-                    note = runCatching {
-                        LmStudio(ModelStore.NV_URL, key).chat(ModelStore.NV_MODEL, arrayOf("user"), arrayOf("Say hi in one word."), null, 8, 0.2f) { true }
-                        "Your key works."
-                    }.getOrElse { "That didn't work: ${it.message}" }
-                    working = false
-                }
-            }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            CapriButton(if (working) "Checking..." else "Check key", Modifier.weight(1f), quiet = true, enabled = !working && key.isNotBlank()) { check(key) }
             if (using) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Pill("In use", GREEN) }
-            else CapriButton("Use it", Modifier.weight(1f), color = GREEN, enabled = key.isNotBlank()) {
+            else CapriButton("Use it", Modifier.weight(1f), color = GREEN, enabled = key.isNotBlank() && !working) {
                 prefs.brain = ModelStore.NV.id
                 using = true
                 CapriService.brainChanged(ctx)
             }
         }
-        if (note.isNotEmpty()) Text(note, color = INK, fontFamily = SANS, fontSize = 12.5.sp, lineHeight = 17.sp)
+        if (note.isNotEmpty()) Text(note, color = if (good) INK else PINK, fontFamily = SANS, fontSize = 12.5.sp, lineHeight = 17.sp)
+        Text("Still not working? Copy the whole key again, check you're online, and make sure your NVIDIA account is verified. " +
+            "If NVIDIA's biggest model is busy she switches to a smaller NVIDIA model by herself.",
+            color = MUTED, fontFamily = SANS, fontSize = 12.sp, lineHeight = 16.sp)
         var glance by remember { mutableStateOf(prefs.cloudGlance) }
         Toggle("Let her look on her own", "with this on, React on her own works in every app here too: your screen, " +
             "chats and DMs included, goes to NVIDIA every minute or two. Off: only public feeds like TikTok, and only their text.", glance) {

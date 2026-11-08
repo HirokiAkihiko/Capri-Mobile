@@ -1,3 +1,4 @@
+#include <cstdlib>
 // Capri's brain on the phone: a thin JNI bridge to llama.cpp (b11932, same as the desktop build).
 // load() a GGUF, generate() a chat reply with the model's own template (thinking off), streaming pieces to Kotlin.
 // The prompt of the last turn stays in the KV cache, so the next turn only processes what's new.
@@ -443,6 +444,24 @@ Java_com_capri_mobile_Llama_hear(JNIEnv * env, jobject, jlong handle, jfloatArra
     llama_memory_clear(llama_get_memory(b->ctx), true);
     b->cached.clear();
     return to_java(env, reply);
+}
+
+// The brain's worker threads sleep between replies instead of spinning (spinning heats the phone up for nothing).
+extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *, void *) {
+    setenv("OMP_WAIT_POLICY", "PASSIVE", 0);
+    setenv("KMP_BLOCKTIME", "0", 0);
+    setenv("GOMP_SPINCOUNT", "0", 0);
+    return JNI_VERSION_1_6;
+}
+
+// Closes her eyes (frees the vision projector) to give memory back; the brain itself stays loaded.
+extern "C" JNIEXPORT void JNICALL
+Java_com_capri_mobile_Llama_freeEyes(JNIEnv *, jobject, jlong handle) {
+    auto * b = (Brain *) handle;
+    if (b && b->eyes) {
+        mtmd_free(b->eyes);
+        b->eyes = nullptr;
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL

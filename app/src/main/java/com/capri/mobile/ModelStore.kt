@@ -52,9 +52,24 @@ object ModelStore {
     val NV = Model("nvidia", "Nemotron Ultra 550B", "NVIDIA's cloud, with your own free key", "", "", 0, 0)
     const val NV_URL = "https://integrate.api.nvidia.com"
     const val NV_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
+    // if the big one is busy or not open to this key, she thinks with these instead (same key)
+    val NV_TEXT = listOf(NV_MODEL, "nvidia/nemotron-3-super-120b-a12b", "nvidia/nemotron-3.5-lightning-30b-a3b")
     // Nemotron Ultra reads text only, so she looks through NVIDIA's vision models, on the same key (the first that answers)
     val NV_EYES = listOf("nvidia/nemotron-3.5-super-vl-120b-a12b", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning")
     const val NV_KEY_PAGE = "https://build.nvidia.com/nvidia/nemotron-3-ultra-550b-a55b"
+
+    /** How many threads her brain uses: the fast cores only, at most 4 (more just heats the phone up). */
+    fun threads(): Int {
+        val n = Runtime.getRuntime().availableProcessors()
+        val freq = (0 until n).mapNotNull {
+            runCatching { File("/sys/devices/system/cpu/cpu$it/cpufreq/cpuinfo_max_freq").readText().trim().toLong() }.getOrNull()
+        }
+        val fast = if (freq.isEmpty()) n / 2 else freq.count { it >= freq.max() * 0.75 }
+        return fast.coerceIn(2, 4)
+    }
+
+    /** Small phones skip the big extras (the full-screen intro). */
+    fun lowRam(c: Context) = c.getSystemService(android.app.ActivityManager::class.java)?.isLowRamDevice == true || ramGb(c) <= 3
 
     fun remote(m: Model) = m.id == LM.id || m.id == NV.id
 

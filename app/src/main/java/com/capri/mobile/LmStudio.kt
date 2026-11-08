@@ -22,6 +22,11 @@ import java.util.concurrent.TimeUnit
 class LmStudio(url: String, private val key: String = "") {
     data class Info(val id: String, val loaded: Boolean, val vision: Boolean)
 
+    /** Other models to try, in order, when the one asked for is busy or missing (NVIDIA). */
+    var alts: List<String> = emptyList()
+    /** Called with the model that answered when it wasn't the first choice, so the next message goes straight to it. */
+    var switched: ((String) -> Unit)? = null
+
     val base = normalize(url)
 
     /** The models LM Studio has, loaded first. Empty when it isn't answering. */
@@ -46,6 +51,23 @@ class LmStudio(url: String, private val key: String = "") {
      */
     fun chat(model: String, roles: Array<String>, contents: Array<String>, jpeg: ByteArray?, maxTokens: Int,
              temperature: Float, piece: Llama.Piece): String {
+        val chain = if (jpeg == null) (listOf(model) + alts).distinct() else listOf(model)
+        var why: Exception? = null
+        for (m in chain) {
+            try {
+                val out = chatWith(m, roles, contents, jpeg, maxTokens, temperature, piece)
+                if (m != model) switched?.invoke(m)
+                return out
+            } catch (e: Exception) {
+                why = e
+                if (!retryable(e)) throw e
+            }
+        }
+        throw why ?: RuntimeException("no answer")
+    }
+
+    private fun chatWith(model: String, roles: Array<String>, contents: Array<String>, jpeg: ByteArray?, maxTokens: Int,
+                         temperature: Float, piece: Llama.Piece): String {
         val messages = JSONArray()
         for (i in roles.indices) {
             val m = JSONObject().put("role", roles[i])
@@ -75,24 +97,49 @@ class LmStudio(url: String, private val key: String = "") {
 
     private class Rejected(message: String) : RuntimeException(message)
 
+    /** The server said no with [code]; the message is written for people, not programmers. */
+    class Refused(val code: Int, message: String) : RuntimeException(message)
+
+    private fun retryable(e: Exception) = when (e) {
+        is Refused -> e.code == 403 || e.code == 404 || e.code == 408 || e.code == 429 || e.code >= 500
+        is java.net.SocketTimeoutException -> true
+        else -> false
+    }
+
+    private fun why(code: Int, body: String): String {
+        val detail = runCatching {
+            val j = JSONObject(body)
+            j.optString("detail").ifEmpty { j.optJSONObject("error")?.optString("message").orEmpty() }.ifEmpty { j.optString("title") }
+        }.getOrDefault("").take(140)
+        val cloud = key.isNotEmpty()
+        val what = when {
+            code == 401 -> if (cloud) "NVIDIA says this key isn't valid. Copy the whole key again, or make a new one" else "the server wants a key"
+            code == 403 -> if (cloud) "NVIDIA said no: your account may need verifying (email or phone), or this key can't use that model" else "the server said no (403)"
+            code == 404 -> if (cloud) "that NVIDIA model isn't available right now" else "LM Studio has no model loaded"
+            code == 429 -> if (cloud) "NVIDIA is busy, or your free credits for today ran out. Try again in a bit" else "too many requests, wait a moment"
+            code >= 500 -> if (cloud) "NVIDIA's servers are having trouble ($code). Try again in a bit" else "LM Studio had an error ($code)"
+            else -> "the server said $code"
+        }
+        return if (detail.isEmpty()) what else "$what ($detail)"
+    }
+
     private fun send(body: JSONObject, piece: Llama.Piece): String {
         val c = URL("$base/v1/chat/completions").openConnection() as HttpURLConnection
-        c.connectTimeout = 5000
-        c.readTimeout = 120_000
+        c.connectTimeout = if (key.isNotEmpty()) 15_000 else 5000
+        c.readTimeout = if (key.isNotEmpty()) 60_000 else 120_000
         c.requestMethod = "POST"
         c.doOutput = true
         c.setRequestProperty("Content-Type", "application/json")
         if (key.isNotEmpty()) c.setRequestProperty("Authorization", "Bearer $key")
         try {
             c.outputStream.use { it.write(body.toString().toByteArray()) }
-            if (c.responseCode !in 200..299) {
-                val why = c.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                if (c.responseCode == 400 || c.responseCode == 422) throw Rejected("server said ${c.responseCode}: ${why.take(200)}")
-                throw RuntimeException(when (c.responseCode) {
-                    401, 403 -> "that key doesn't work"
-                    429 -> "too many requests, wait a moment"
-                    else -> "server said ${c.responseCode}: ${why.take(200)}"
-                })
+            val code = try { c.responseCode } catch (e: java.net.UnknownHostException) {
+                throw RuntimeException("no internet connection")
+            }
+            if (code !in 200..299) {
+                val body = c.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                if (code == 400 || code == 422) throw Rejected("server said $code: ${body.take(200)}")
+                throw Refused(code, why(code, body))
             }
             val out = StringBuilder()
             var thinking = false
@@ -136,6 +183,21 @@ class LmStudio(url: String, private val key: String = "") {
 
     companion object {
         const val PORT = 1234
+
+        /** Checks an NVIDIA key with a one-word hello. Returns (works, what to tell the user). Blocks. */
+        fun checkNvidia(key: String): Pair<Boolean, String> {
+            val client = LmStudio(ModelStore.NV_URL, key)
+            client.alts = ModelStore.NV_TEXT
+            var used = ModelStore.NV_MODEL
+            client.switched = { used = it }
+            return try {
+                client.chat(ModelStore.NV_MODEL, arrayOf("user"), arrayOf("Say hi in one word."), null, 16, 0.2f) { true }
+                true to (if (used == ModelStore.NV_MODEL) "Your key works. She's thinking with NVIDIA now."
+                else "Your key works. NVIDIA's biggest model is busy, so she's using ${used.substringAfter('/')} for now.")
+            } catch (e: Exception) {
+                false to (e.message ?: "that didn't work")
+            }
+        }
 
         /** "192.168.1.5" -> "http://192.168.1.5:1234", whatever way you typed it. */
         fun normalize(url: String): String {

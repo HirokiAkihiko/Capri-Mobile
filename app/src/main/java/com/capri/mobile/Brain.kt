@@ -38,19 +38,40 @@ class Brain(private val context: Context) {
     var onRemembered: ((List<String>) -> Unit)? = null
 
     /** Loads [m] (or keeps it, if that's what's loaded). [done] on the main thread: null = ok, else why not. */
+    @Volatile private var eyesOn = false  // her eyes are open (loaded) right now: only after she's been asked to look
+    private val closeEyes = Runnable { dropEyes() }
+
+    /** Frees her eyes to give memory back. They open again the next time she's asked to look. */
+    fun dropEyes() = worker.execute {
+        if (eyesOn && handle != 0L) Llama.freeEyes(handle)
+        eyesOn = false
+    }
+
     fun load(m: Model, done: (String?) -> Unit) {
         if (ModelStore.remote(m)) { connect(m, done); return }
+        val ram = ModelStore.ramGb(context)
+        if (m.minRamGb > ram) {  // loading it anyway can take the whole phone down
+            unload()
+            done("${m.label} needs ${m.minRamGb} GB of RAM and this phone has about $ram. Pick a smaller brain in my app.")
+            return
+        }
+        val mi = android.app.ActivityManager.MemoryInfo()
+        context.getSystemService(android.app.ActivityManager::class.java)?.getMemoryInfo(mi)
+        if (mi.lowMemory) {
+            done("your phone is low on memory right now. Close some apps, then tap Summon again")
+            return
+        }
         if (loaded?.id == m.id && handle != 0L && canSee == ModelStore.eyesInstalled(context, m)) { done(null); return }
         loading = true
         worker.execute {
             lm = null
             if (handle != 0L) { Llama.free(handle); handle = 0L; loaded = null }
-            val threads = (Runtime.getRuntime().availableProcessors() - 2).coerceIn(2, 6)
+            val threads = ModelStore.threads()
             val h = runCatching { Llama.load(ModelStore.file(context, m).path, 2048, threads) }.getOrDefault(0L)
             val err = if (h == 0L) runCatching { Llama.error() }.getOrDefault("couldn't load") else null
             if (h != 0L) { handle = h; loaded = m }
-            canSee = h != 0L && ModelStore.eyesInstalled(context, m) &&
-                runCatching { Llama.loadEyes(h, ModelStore.eyes(context, m).path, threads) }.getOrDefault(false)
+            canSee = h != 0L && ModelStore.eyesInstalled(context, m)  // they open when she's first asked to look
+            eyesOn = false
             loading = false
             main.post { done(err) }
         }
@@ -67,6 +88,10 @@ class Brain(private val context: Context) {
             eyeModels = emptyList()
             val nvidia = m.id == ModelStore.NV.id
             val client = if (nvidia) LmStudio(ModelStore.NV_URL, prefs.nvKey) else LmStudio(prefs.lmUrl)
+            if (nvidia) {
+                client.alts = ModelStore.NV_TEXT
+                client.switched = { lmModel = it }  // the big one was busy: stay on the one that answered
+            }
             val models = when {
                 nvidia -> if (prefs.nvKey.isBlank()) emptyList() else listOf(LmStudio.Info(ModelStore.NV_MODEL, true, true))
                 client.base.isEmpty() -> emptyList()
@@ -105,6 +130,7 @@ class Brain(private val context: Context) {
         handle = 0L
         loaded = null
         canSee = false
+        eyesOn = false
         eyeModels = emptyList()
     }
 
@@ -211,6 +237,13 @@ class Brain(private val context: Context) {
                         val c = px[i]
                         rgb[i * 3] = (c shr 16).toByte(); rgb[i * 3 + 1] = (c shr 8).toByte(); rgb[i * 3 + 2] = c.toByte()
                     }
+                    if (!eyesOn) {
+                        val m = loaded ?: throw RuntimeException("no brain")
+                        eyesOn = runCatching { Llama.loadEyes(handle, ModelStore.eyes(context, m).path, ModelStore.threads()) }.getOrDefault(false)
+                        if (!eyesOn) throw RuntimeException("my eyes couldn't open, your phone may be low on memory")
+                    }
+                    main.removeCallbacks(closeEyes)  // small phones close them again after a while
+                    if (ModelStore.ramGb(context) <= 8) main.postDelayed(closeEyes, 90_000)
                     Llama.look(handle, rgb, w, h, roles, contents, 70, 0.7f, streamer(live))
                 }
             }.getOrElse { lastError = it.message.orEmpty(); "" }

@@ -23,12 +23,19 @@ class QwenEars(private val context: Context, private val heard: (String) -> Unit
     private var pcm = ShortArray(RATE * 30)
     private var n = 0
 
+    private val rest = Runnable { free() }
+
+    /** Frees her ears (about 1 GB). They load again the next time you hold her to talk. */
+    fun free() = worker.execute {
+        if (handle != 0L) { Llama.free(handle); handle = 0L }
+    }
+
     /** Starts loading her ears before you've finished talking the first time. */
     fun warm() = worker.execute { load() }
 
     private fun load() {
         if (handle != 0L) return
-        val threads = (Runtime.getRuntime().availableProcessors() - 2).coerceIn(2, 4)
+        val threads = ModelStore.threads()
         val h = runCatching { Llama.load(ModelStore.file(context, ModelStore.ASR).path, 1024, threads) }.getOrDefault(0L)
         if (h != 0L && runCatching { Llama.loadEars(h, ModelStore.eyes(context, ModelStore.ASR).path, threads) }.getOrDefault(false)) handle = h
         else if (h != 0L) Llama.free(h)
@@ -71,6 +78,8 @@ class QwenEars(private val context: Context, private val heard: (String) -> Unit
         worker.execute {
             val text = transcribe(samples)
             main.post { if (text.isEmpty()) failed("nothing") else heard(text) }
+            main.removeCallbacks(rest)
+            main.postDelayed(rest, 120_000)  // not talking for a while: give the memory back
         }
     }
 

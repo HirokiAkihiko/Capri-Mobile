@@ -499,6 +499,18 @@ private fun SetupTab(tick: Int, refresh: () -> Unit) {
     var skin by remember { mutableStateOf(prefs.skin) }
     var name by remember { mutableStateOf(prefs.userName) }
 
+    var crash by remember { mutableStateOf(CrashLog.last(ctx)) }
+    if (crash.isNotEmpty()) Card("She crashed last time", "Sorry! Copy this report and send it to us in #suggestions with the bug tag. " +
+        "It only has your phone model, Android version and what went wrong.") {
+        Text(crash.take(500), color = MUTED, fontFamily = MONO, fontSize = 11.sp, lineHeight = 14.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CapriButton("Copy report", Modifier.weight(1f), color = GREEN) {
+                ctx.getSystemService(android.content.ClipboardManager::class.java)
+                    ?.setPrimaryClip(android.content.ClipData.newPlainText("Capri crash report", crash))
+            }
+            CapriButton("Dismiss", Modifier.weight(1f), quiet = true) { CrashLog.clear(ctx); crash = "" }
+        }
+    }
     Card("Permissions") {
         @Composable
         fun line(title: String, ok: Boolean, why: String, fix: () -> Unit) {

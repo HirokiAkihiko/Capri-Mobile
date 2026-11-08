@@ -28,6 +28,10 @@ class CapriAccess : AccessibilityService() {
             private set
         @Volatile var ledges: List<Rect> = emptyList()
             private set
+        @Volatile var inputs: List<Rect> = emptyList()  // text boxes on screen: she lets taps through over them
+            private set
+        @Volatile var keyboard = false  // the keyboard is up
+            private set
         @Volatile var foreground = ""
             private set
         var listener: Listener? = null
@@ -56,7 +60,14 @@ class CapriAccess : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
+    private var lastScan = 0L
+
+    private fun checkKeyboard() {
+        keyboard = runCatching { windows.any { it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD } }.getOrDefault(false)
+    }
+
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
+        if (e.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) { checkKeyboard(); return }
         val pkg = e.packageName?.toString() ?: return
         if (pkg in ignore) return
         when (e.eventType) {
@@ -65,9 +76,10 @@ class CapriAccess : AccessibilityService() {
                     foreground = pkg
                     listener?.onApp(pkg)
                 }
-                queueScan(150)
+                checkKeyboard()
+                queueScan(300)
             }
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED, AccessibilityEvent.TYPE_VIEW_SCROLLED -> queueScan(450)
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED, AccessibilityEvent.TYPE_VIEW_SCROLLED -> queueScan(1500)
             AccessibilityEvent.TYPE_VIEW_CLICKED -> {
                 val r = Rect()
                 e.source?.getBoundsInScreen(r)
@@ -76,10 +88,12 @@ class CapriAccess : AccessibilityService() {
         }
     }
 
+    /** Looks over the screen at most every 1.2 s: scrolling a feed fires these events nonstop. */
     private fun queueScan(delay: Long) {
         if (scanQueued) return
         scanQueued = true
-        handler.postDelayed({ scanQueued = false; scan() }, delay)
+        val wait = maxOf(delay, 1200 - (android.os.SystemClock.uptimeMillis() - lastScan))
+        handler.postDelayed({ scanQueued = false; scan() }, wait)
     }
 
     /**
@@ -138,7 +152,9 @@ class CapriAccess : AccessibilityService() {
 
     /** The tappable things on screen (app icons, buttons, cards): their tops are places she can sit. */
     private fun scan() {
+        lastScan = android.os.SystemClock.uptimeMillis()
         val root = runCatching { rootInActiveWindow }.getOrNull() ?: return
+        val boxes = ArrayList<Rect>()
         val dm = resources.displayMetrics
         val minSide = (28 * dm.density).toInt()
         val out = ArrayList<Rect>()
@@ -149,6 +165,7 @@ class CapriAccess : AccessibilityService() {
             val n = queue.removeFirst()
             seen++
             if (!n.isVisibleToUser) continue
+            if (n.isEditable) Rect().also { n.getBoundsInScreen(it); boxes.add(it) }
             if (n.isClickable || n.isLongClickable) {
                 val r = Rect()
                 n.getBoundsInScreen(r)
@@ -159,6 +176,7 @@ class CapriAccess : AccessibilityService() {
             for (i in 0 until n.childCount) n.getChild(i)?.let { queue.add(it) }
         }
         ledges = out
+        inputs = boxes
         listener?.onLedges()
     }
 }

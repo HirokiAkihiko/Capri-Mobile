@@ -22,6 +22,7 @@ object Llama {
 
     /** Loads her eyes (the brain's vision projector, an mmproj GGUF). */
     external fun loadEyes(handle: Long, path: String, nThreads: Int): Boolean
+    external fun freeEyes(handle: Long)
 
     /** Like [generate], with a picture (RGB bytes, w x h) where "{IMAGE}" sits in the last message. */
     external fun look(handle: Long, rgb: ByteArray, w: Int, h: Int, roles: Array<String>, contents: Array<String>,

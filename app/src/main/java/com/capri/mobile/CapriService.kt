@@ -131,7 +131,9 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     private var mood = false      // mini for a while because she felt like it
     private var moodUntil = 0f
     private var nextMood = 120f + Random.nextFloat() * 180f
-    private val mini get() = always || mood
+    private var fsMini = false   // mini for a fullscreen video or game
+    private var nextFsCheck = 0f
+    private val mini get() = always || mood || fsMini
     private var miniAt = 0f       // when she shrinks (after her entrance)
     private var annoyedUntil = 0f
     private var blinkUntil = 0f
@@ -248,7 +250,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         loadBrain(quiet = true)
         footX = left + (right - left) * 0.72f
         sense(true)
-        if (quietStart && mini) enterMini() else if (quietStart) dropIn() else startIntro()
+        if (quietStart && mini) enterMini() else if (quietStart || ModelStore.lowRam(this)) dropIn() else startIntro()
         quietStart = false
         ready = true
         startLoop()
@@ -318,6 +320,14 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         handler.postDelayed({ greet() }, 900)
     }
 
+    /** The phone needs memory back: her eyes and ears go first (they come back when needed). */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (!ready || level < TRIM_MEMORY_RUNNING_LOW) return
+        brain.dropEyes()
+        qwen?.free()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (!ready) return START_STICKY
         when (intent?.action) {
@@ -376,11 +386,23 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     // -- the loop ------------------------------------------------------------------------------------------
     private val frame = object : Choreographer.FrameCallback {
         override fun doFrame(nanos: Long) {
-            val dt = if (lastFrame == 0L) 0.016f else ((nanos - lastFrame) / 1e9f).coerceIn(0f, 0.05f)
+            val dt = if (lastFrame == 0L) 0.016f else ((nanos - lastFrame) / 1e9f).coerceIn(0f, 0.1f)
             lastFrame = nanos
             update(dt)
-            if (!paused && running) Choreographer.getInstance().postFrameCallback(this)
+            if (!paused && running) {
+                val wait = pace()
+                if (wait == 0L) Choreographer.getInstance().postFrameCallback(this)
+                else Choreographer.getInstance().postFrameCallbackDelayed(this, wait)
+            }
         }
+    }
+
+    /** ms to wait before the next frame: every frame while she flies or bursts, ~25 fps standing, ~15 fps mini. */
+    private fun pace(): Long = when {
+        intro != null || fxOn || mode == Mode.FALL || mode == Mode.DRAG || mode == Mode.AWAY || mode == Mode.INTRO -> 0L
+        bubbleOn && !bubble.done -> 20L
+        mode == Mode.CHIP || mode == Mode.HIDDEN -> 60L
+        else -> 50L  // her clips run at 8-15 fps, so 20 is plenty
     }
 
     private fun startLoop() {
@@ -419,6 +441,12 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
             }
         }
         if (mini && (mode == Mode.IDLE || mode == Mode.PERCH) && now >= miniAt && !holdingToTalk) nap()
+        if (fsMini && now > nextFsCheck) {
+            nextFsCheck = now + 1.5f
+            probe?.requestApplyInsets()
+            val vis = probe?.rootWindowInsets?.isVisible(WindowInsets.Type.statusBars())
+            if (vis == true && Build.VERSION.SDK_INT >= 30) { fullscreen = false; onFullscreen(false) }
+        }
         moods()
         intro?.let { stepIntro(dt, it) }
         glitchFor -= dt
@@ -446,9 +474,29 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     private var ghosted = false
 
     /** While her own app is open taps go through her (Android wants click-through overlays at 80% or less). */
+    private var keyboardUp = false
+    private var overInput = false
+    private var nextGhostCheck = 0f
+    @Volatile private var imeProbe = false
+
+    /** Is a text box (from accessibility) under her? Then taps go through her so you can type. */
+    private fun overText(): Boolean {
+        val boxes = CapriAccess.inputs
+        if (boxes.isEmpty()) return false
+        val r = if (herOn) Rect(herLp.x + her.margin, herLp.y + her.margin, herLp.x + herLp.width - her.margin, herLp.y + herLp.height - her.margin)
+        else if (chipOn) Rect(chipLp.x, chipLp.y, chipLp.x + chipLp.width, chipLp.y + chipLp.height) else return false
+        return boxes.any { Rect.intersects(it, r) }
+    }
+
     private fun ghost() {
-        if (appOpen == ghosted) return
-        ghosted = appOpen
+        if (now > nextGhostCheck) {
+            nextGhostCheck = now + 0.4f
+            keyboardUp = CapriAccess.keyboard || imeProbe
+            overInput = overText()
+        }
+        val want = appOpen || keyboardUp || overInput
+        if (want == ghosted) return
+        ghosted = want
         val touch = WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         for (lp in listOf(herLp, chipLp)) {
             lp.flags = if (ghosted) lp.flags or touch else lp.flags and touch.inv()
@@ -1043,7 +1091,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         val pkg = CapriAccess.foreground
         val app = feeds[pkg] ?: appName(pkg)
         if (pkg.isEmpty() || pkg == homeApp || PRIVATE.containsMatchIn(pkg) || PRIVATE.containsMatchIn(app)) return
-        nextFeed = now + 40f + Random.nextFloat() * 70f
+        nextFeed = now + if (brain.remote) 40f + Random.nextFloat() * 70f else 240f + Random.nextFloat() * 240f
         if (brain.loaded == null || brain.busy || Random.nextFloat() < 0.15f) return
         val cloudOk = !brain.cloud || prefs.cloudGlance  // your chats only go to NVIDIA by themselves if you said so
         if (!cloudOk && pkg !in feeds) return
@@ -1062,8 +1110,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
             }
         }
         // an on-phone brain takes a while over a picture, so it reads the words whenever there are any
-        if (brain.canSee && cloudOk && Build.VERSION.SDK_INT >= 30 && (brain.remote || text.length < 40)) {
-            if (!brain.remote) nextFeed += 120f
+        if (brain.canSee && cloudOk && Build.VERSION.SDK_INT >= 30 && brain.remote) {
             val words = if (text.length >= 40) " The words on it: \"$text\"." else ""
             access.screenshot(if (brain.remote) 1280 else 768) { shot ->
                 if (shot == null || brain.busy) return@screenshot
@@ -1080,7 +1127,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     private fun sense(on: Boolean) {
         val sm = sensors ?: return
         if (on && !sensing) {
-            sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+            sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { sm.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
             sensing = true
         } else if (!on && sensing) {
             sm.unregisterListener(this)
@@ -1185,6 +1232,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
 
     // -- accessibility: apps, icons, taps ------------------------------------------------------------------------
     override fun onApp(pkg: String) {
+        if (fsMini && pkg == homeApp) { fullscreen = false; onFullscreen(false) }
         handler.postDelayed({ react(pkg) }, 1200)
     }
 
@@ -1412,8 +1460,10 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
             lastBlip = now
             (blips ?: Blips().also { blips = it }).blip()
         }
+        val bx = bubbleLp.x
+        val by = bubbleLp.y
         placeBubble()
-        wm.updateViewLayout(bubble, bubbleLp)
+        if (bx != bubbleLp.x || by != bubbleLp.y) wm.updateViewLayout(bubble, bubbleLp)
     }
 
     private fun placeBubble() {
@@ -1433,6 +1483,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         if (Build.VERSION.SDK_INT < 30) return
         val v = View(this)
         v.setOnApplyWindowInsetsListener { _, insets ->
+            imeProbe = insets.isVisible(WindowInsets.Type.ime())
             val full = !insets.isVisible(WindowInsets.Type.statusBars())
             if (full != fullscreen) { fullscreen = full; handler.post { onFullscreen(full) } }
             insets
@@ -1440,24 +1491,38 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         runCatching { wm.addView(v, overlayParams(1, 1, touchable = false)) }.onSuccess { probe = v }
     }
 
+    /** Fullscreen video or game: she shrinks to her eyes in the corner and comes back to full size after. */
     private fun onFullscreen(full: Boolean) {
-        if (mode == Mode.INTRO) return
-        if (full && (visible() || mode == Mode.FALL)) {
-            hiddenFrom = Mode.IDLE
+        if (mode == Mode.INTRO || !ready) return
+        measure()
+        if (full) {
+            fsMini = true
             hush()
-            hideHer()
-            perch = null
-            mode = Mode.HIDDEN
-        } else if (full && mode == Mode.CHIP && chipOn) {
-            hideChip()
-        } else if (!full && mode == Mode.HIDDEN) {
-            footY = floor
-            her.rot = 0f
-            her.visibility = View.VISIBLE
-            showHer()
-            arrive()
-        } else if (!full && mode == Mode.CHIP && !chipOn) {
-            showChip()
+            if (mode == Mode.CHIP) {
+                if (!chipOn) { fitChip(); placeChip(); showChip() } else { placeChip(); wm.updateViewLayout(chip, chipLp) }
+            } else if (mode != Mode.IDLE && mode != Mode.PERCH && mode != Mode.PEEK) {
+                miniAt = 0f  // mid-move (flying, rebuilding): she shrinks as soon as she lands
+            } else {
+                hideHer()
+                perch = null
+                her.rot = 0f
+                fitChip()
+                placeChip()
+                showChip()
+                mode = Mode.CHIP
+                sense(false)
+            }
+        } else {
+            fsMini = false
+            if (mode == Mode.HIDDEN) {
+                footY = floor
+                her.rot = 0f
+                her.visibility = View.VISIBLE
+                showHer()
+                arrive()
+            } else if (mode == Mode.CHIP) {
+                if (!mini) wake() else if (!chipOn) { placeChip(); showChip() } else { placeChip(); wm.updateViewLayout(chip, chipLp) }
+            }
         }
     }
 
@@ -1538,11 +1603,16 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
     private fun measure() {
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         if (Build.VERSION.SDK_INT >= 30) {
+            val real = android.graphics.Point()
+            @Suppress("DEPRECATION") (getSystemService(android.hardware.display.DisplayManager::class.java)
+                .getDisplay(android.view.Display.DEFAULT_DISPLAY) ?: wm.defaultDisplay).getRealSize(real)
             val m = wm.currentWindowMetrics
-            val ins = m.windowInsets.getInsetsIgnoringVisibility(
+            val fresh = m.bounds.width() == real.x && m.bounds.height() == real.y
+            val ins = if (fresh) m.windowInsets.getInsetsIgnoringVisibility(
                 WindowInsets.Type.navigationBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.statusBars())
-            screenW = m.bounds.width()
-            floor = (m.bounds.height() - ins.bottom).toFloat()
+            else android.graphics.Insets.of(0, (24 * dp).toInt(), 0, (48 * dp).toInt())  // stale: safe margins
+            screenW = real.x
+            floor = (real.y - ins.bottom).toFloat()
             left = ins.left.toFloat()
             right = (screenW - ins.right).toFloat()
             top = ins.top.toFloat()

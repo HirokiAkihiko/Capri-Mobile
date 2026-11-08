@@ -66,6 +66,12 @@ class DownloadService : Service() {
         var err = ""
         var tries = 0
         state.value = State(m.id, part.length(), m.bytes)
+        runCatching { part.parentFile?.mkdirs() }
+        val room = runCatching { (part.parentFile ?: m.file.parentFile)!!.usableSpace }.getOrDefault(Long.MAX_VALUE)
+        if (room < m.bytes - part.length() + 300_000_000L) {  // say so now instead of failing at 90%
+            err = "not enough space: free up about %.1f GB on your phone".format((m.bytes - part.length() + 300_000_000L - room) / 1e9)
+            tries = 99
+        }
         while (!cancel && part.length() < m.bytes && tries < 40) {
             tries++
             try {
@@ -103,7 +109,12 @@ class DownloadService : Service() {
                 }
                 tries = 0
             } catch (e: Exception) {
-                err = e.message ?: e.javaClass.simpleName
+                err = when (e) {
+                    is java.net.UnknownHostException -> "no internet connection"
+                    is java.io.IOException -> if ("ENOSPC" in e.message.orEmpty()) "your phone is out of space" else "connection dropped, retrying"
+                    else -> e.message ?: e.javaClass.simpleName
+                }
+                if ("out of space" in err) break
                 Thread.sleep(minOf(30_000L, 2000L * tries))
             }
         }

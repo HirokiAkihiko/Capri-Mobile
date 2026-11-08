@@ -20,7 +20,9 @@ import kotlin.math.pow
  */
 @SuppressLint("ViewConstructor")
 class IntroView(context: Context) : View(context) {
-    private class Frame(val art: Bitmap, val box: Rect)
+    private class Frame(val box: Rect) {
+        @Volatile var art: Bitmap? = null
+    }
 
     private var frames: List<Frame> = emptyList()
     private var fw = 1f
@@ -29,8 +31,10 @@ class IntroView(context: Context) : View(context) {
         private set
     var landed = false
         private set
-    var done = false
+    @Volatile var done = false
         private set
+    @Volatile private var showing = 0
+    private var lastArt: Bitmap? = null
     private var t = 0f
     private var kFull = 1f
     private var kEnd = 1f
@@ -45,25 +49,36 @@ class IntroView(context: Context) : View(context) {
         Thread({ load() }, "capri-intro").start()
     }
 
+    /**
+     * Only a few frames are ever in memory: the one showing and the next few, decoded just ahead of time (each one is
+     * a screenful, and all of them at once was hundreds of MB).
+     */
     private fun load() {
-        val pool = Executors.newFixedThreadPool(3)
         try {
             val lines = context.assets.open("intro/index.txt").bufferedReader().readLines().filter { it.isNotBlank() }
             val size = lines[0].split(" ")
             fw = size[0].toFloat()
             fh = size[1].toFloat()
-            frames = lines.drop(1).mapIndexed { i, line ->
-                pool.submit(Callable {
-                    val b = line.split(" ").map { it.toInt() }
-                    Frame(context.assets.open("intro/$i.webp").use { BitmapFactory.decodeStream(it) }, Rect(b[0], b[1], b[2], b[3]))
-                })
-            }.map { it.get() }
+            frames = lines.drop(1).map { line -> line.split(" ").map { it.toInt() }.let { b -> Frame(Rect(b[0], b[1], b[2], b[3])) } }
+            for (i in 0 until minOf(AHEAD, frames.size)) decode(i)
         } catch (e: Exception) {  // she still arrives without it: the service falls back to dropping in
             frames = emptyList()
         } finally {
-            pool.shutdown()
             ready = true
         }
+        try {
+            while (!done && frames.isNotEmpty()) {
+                val at = showing
+                for (i in frames.indices) if (i < at - 1) frames[i].art = null  // behind us: let it go
+                for (i in at until minOf(at + AHEAD, frames.size)) if (frames[i].art == null) decode(i)
+                Thread.sleep(6)
+            }
+        } catch (e: Throwable) {  // out of memory or interrupted: it just shows what it has
+        }
+    }
+
+    private fun decode(i: Int) {
+        frames[i].art = context.assets.open("intro/$i.webp").use { BitmapFactory.decodeStream(it) }
     }
 
     val usable get() = frames.isNotEmpty()
@@ -93,14 +108,17 @@ class IntroView(context: Context) : View(context) {
 
     /** Frees the frames (a screenful each): only ever played once. */
     fun release() {
-        for (f in frames) f.art.recycle()
+        done = true
+        for (f in frames) f.art = null
         frames = emptyList()
+        lastArt = null
     }
 
     override fun onDraw(canvas: Canvas) {
         if (frames.isEmpty() || done) return
         var i = frames.lastIndex
         while (i > 0 && t < startOf(i)) i--
+        showing = i
         val mix = if (i < frames.lastIndex) {
             smooth(((t - startOf(i)) / (startOf(i + 1) - startOf(i)) - (1 - BLEND)) / BLEND)
         } else 0f
@@ -122,9 +140,11 @@ class IntroView(context: Context) : View(context) {
     }
 
     private fun draw(canvas: Canvas, f: Frame, x0: Float, y0: Float, k: Float, a: Float) {
+        val art = f.art ?: lastArt ?: return  // not decoded yet: hold the last one rather than flash
+        if (f.art != null) lastArt = art
         paint.alpha = (255 * a).toInt().coerceIn(0, 255)
         dst.set(x0 + f.box.left * k, y0 + f.box.top * k, x0 + f.box.right * k, y0 + f.box.bottom * k)
-        canvas.drawBitmap(f.art, null, dst, paint)
+        canvas.drawBitmap(art, null, dst, paint)
     }
 
     private fun smooth(v: Float): Float {
@@ -133,6 +153,7 @@ class IntroView(context: Context) : View(context) {
     }
 
     private companion object {
+        const val AHEAD = 4          // frames decoded ahead of the one showing
         const val FRAME = 0.033f     // seconds per frame while it fills the screen
         const val FAST = 0.025f      // seconds per frame once it shrinks onto her
         const val SHRINK_FROM = 24   // from this frame on it shrinks from fullscreen down to her size
