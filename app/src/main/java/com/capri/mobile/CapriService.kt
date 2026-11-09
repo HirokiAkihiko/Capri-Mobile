@@ -1107,6 +1107,7 @@ class CapriService : Service(), SensorEventListener, CapriAccess.Listener {
         nextFeed = now + if (brain.remote) 40f + Random.nextFloat() * 70f else 240f + Random.nextFloat() * 240f
         if (brain.loaded == null || brain.busy || Random.nextFloat() < 0.15f) return
         val cloudOk = !brain.cloud || prefs.cloudGlance  // your chats only go to NVIDIA by themselves if you said so
+        if (brain.strictCloud && !prefs.cloudGlance) return  // keyed endpoint in the LM slot: nothing leaves by itself until you opt in
         if (!cloudOk && pkg !in feeds) return
         val access = CapriAccess.instance ?: return
         val text = access.screenText()

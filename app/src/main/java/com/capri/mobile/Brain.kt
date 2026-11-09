@@ -33,6 +33,9 @@ class Brain(private val context: Context) {
     val remote get() = lm != null
     private var eyeModels = emptyList<String>()  // cloud brains that can't see look through these instead
     val cloud get() = eyeModels.isNotEmpty()     // what she looks at leaves your network: only ever when you ask
+    /** Her brain is a keyed cloud endpoint in the LM Studio slot (a reseller, say): she sends nothing by herself there. */
+    @Volatile var strictCloud = false
+        private set
     @Volatile private var stop = false
     /** Called on the main thread with facts she just saved (so she can show she remembered). */
     var onRemembered: ((List<String>) -> Unit)? = null
@@ -49,6 +52,7 @@ class Brain(private val context: Context) {
 
     fun load(m: Model, done: (String?) -> Unit) {
         if (ModelStore.remote(m)) { connect(m, done); return }
+        strictCloud = false
         val ram = ModelStore.ramGb(context)
         if (m.minRamGb > ram) {  // loading it anyway can take the whole phone down
             unload()
@@ -86,8 +90,9 @@ class Brain(private val context: Context) {
             loaded = null
             canSee = false
             eyeModels = emptyList()
+            strictCloud = m.id != ModelStore.NV.id && prefs.lmKey.isNotBlank()
             val nvidia = m.id == ModelStore.NV.id
-            val client = if (nvidia) LmStudio(ModelStore.NV_URL, prefs.nvKey) else LmStudio(prefs.lmUrl)
+            val client = if (nvidia) LmStudio(ModelStore.NV_URL, prefs.nvKey) else LmStudio(prefs.lmUrl, prefs.lmKey)
             if (nvidia) {
                 client.alts = ModelStore.NV_TEXT
                 client.switched = { lmModel = it }  // the big one was busy: stay on the one that answered
@@ -132,6 +137,7 @@ class Brain(private val context: Context) {
         canSee = false
         eyesOn = false
         eyeModels = emptyList()
+        strictCloud = false
     }
 
     /** Sends the picture to the remote brain, or to the first of its eye models that answers. */

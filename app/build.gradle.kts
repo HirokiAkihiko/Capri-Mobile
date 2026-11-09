@@ -22,8 +22,8 @@ android {
         applicationId = "com.capri.mobile"
         minSdk = 24
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.4.2-beta"
+        versionCode = 9
+        versionName = "0.4.2-axon.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

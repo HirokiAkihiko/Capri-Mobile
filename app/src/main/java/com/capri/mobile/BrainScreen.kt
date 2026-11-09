@@ -198,6 +198,7 @@ private fun PhoneBrains(prefs: Prefs) {
 private fun LmStudioCard(prefs: Prefs) {
     val ctx = LocalContext.current
     var url by remember { mutableStateOf(prefs.lmUrl) }
+    var key by remember { mutableStateOf(prefs.lmKey) }
     var models by remember { mutableStateOf<List<LmStudio.Info>>(emptyList()) }
     var note by remember { mutableStateOf("") }
     var working by remember { mutableStateOf(false) }
@@ -208,13 +209,13 @@ private fun LmStudioCard(prefs: Prefs) {
         working = true
         note = tr("Connecting...")
         thread(name = "capri-lm") {
-            val client = LmStudio(address)
+            val client = LmStudio(address, key.trim())
             val found = runCatching { client.models() }.getOrDefault(emptyList())
             models = found
             working = false
             note = if (found.isEmpty()) tr("Nothing answered at {0}. Is its server on, with \"Serve on Local Network\"?", client.base)
             else tr("Connected to {0}", client.base)
-            if (found.isNotEmpty()) { url = client.base; prefs.lmUrl = client.base }
+            if (found.isNotEmpty()) { url = client.base; prefs.lmUrl = client.base; prefs.lmKey = key.trim() }
         }
     }
     LaunchedEffect(Unit) { if (url.isNotBlank()) connect(url) }
@@ -233,6 +234,18 @@ private fun LmStudioCard(prefs: Prefs) {
         }
         OutlinedTextField(url, { url = it }, label = { Text(tr("Address, like 192.168.1.5")) }, singleLine = true,
             colors = capriField(), shape = chamfer(9.dp), modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(key, { key = it; prefs.lmKey = it.trim() }, label = { Text(tr("API key (cloud endpoints only)")) }, singleLine = true,
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+            colors = capriField(), shape = chamfer(9.dp), modifier = Modifier.fillMaxWidth())
+        Text(tr("This build also takes a cloud endpoint: type its full address (starting with https://) above and paste its API key here. For LM Studio on your own PC, leave the key empty."),
+            color = MUTED, fontFamily = SANS, fontSize = 12.sp, lineHeight = 16.sp)
+        if (key.isNotBlank()) {
+            var glance by remember { mutableStateOf(prefs.cloudGlance) }
+            Toggle(tr("Let her look on her own"), tr("with this on, React on her own may send your screen's text to this endpoint every minute or two. Off: she never sends anything by herself."), glance) {
+                glance = it
+                prefs.cloudGlance = it
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CapriButton(tr("Find on Wi-Fi"), Modifier.weight(1f), quiet = true, enabled = !working) {
                 working = true

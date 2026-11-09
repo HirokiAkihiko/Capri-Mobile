@@ -130,7 +130,10 @@ class LmStudio(url: String, private val key: String = "") {
         c.requestMethod = "POST"
         c.doOutput = true
         c.setRequestProperty("Content-Type", "application/json")
-        if (key.isNotEmpty()) c.setRequestProperty("Authorization", "Bearer $key")
+        if (key.isNotEmpty()) {
+            c.setRequestProperty("Authorization", "Bearer $key")
+            c.setRequestProperty("User-Agent", BROWSER_UA)  // some cloud gateways refuse the default Java user agent
+        }
         try {
             c.outputStream.use { it.write(body.toString().toByteArray()) }
             val code = try { c.responseCode } catch (e: java.net.UnknownHostException) {
@@ -173,6 +176,10 @@ class LmStudio(url: String, private val key: String = "") {
         val c = URL(base + path).openConnection() as HttpURLConnection
         c.connectTimeout = 2500
         c.readTimeout = 5000
+        if (key.isNotEmpty()) {
+            c.setRequestProperty("Authorization", "Bearer $key")
+            c.setRequestProperty("User-Agent", BROWSER_UA)
+        }
         try {
             if (c.responseCode !in 200..299) throw RuntimeException("${c.responseCode}")
             return c.inputStream.bufferedReader().use { it.readText() }
@@ -183,6 +190,7 @@ class LmStudio(url: String, private val key: String = "") {
 
     companion object {
         const val PORT = 1234
+        const val BROWSER_UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
 
         /** Checks an NVIDIA key with a one-word hello. Returns (works, what to tell the user). Blocks. */
         fun checkNvidia(key: String): Pair<Boolean, String> {

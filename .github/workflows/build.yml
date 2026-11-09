@@ -1,0 +1,53 @@
+name: Build APK (Axon mod)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          sdkmanager "platforms;android-37" "build-tools;37.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - name: Build release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: capri-axon-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Publish release with the APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: capri-axon-v0.4.2-1
+          name: Capri 0.4.2 — Axon mod (custom endpoint build)
+          body: |
+            Unofficial mod of Capri-Mobile 0.4.2-beta: the LM Studio slot also accepts
+            any OpenAI-style cloud endpoint with an API key (e.g. AxonAgent).
+            See AXON-MOD.md in the repo for what changed and how to use it.
+
+            Signed with a CI debug key: uninstall the official Capri first if you
+            have it — Android will not install this over a different signature.
+          files: app/build/outputs/apk/release/*.apk

@@ -52,6 +52,10 @@ class Prefs(context: Context) {
         get() = sp.getString("lm_model", "") ?: ""
         set(v) = sp.edit().putString("lm_model", v).apply()
 
+    var lmKey: String  // API key for a cloud endpoint used through the LM Studio slot ("" = none: plain LM Studio on your own PC). Kept with the secrets, out of backups.
+        get() = secrets.getString("lm_key", "") ?: ""
+        set(v) = secrets.edit().putString("lm_key", v).apply()
+
     var skin: String  // her look: a folder in assets/skins
         get() = sp.getString("skin", "capri") ?: "capri"
         set(v) = sp.edit().putString("skin", v).apply()
