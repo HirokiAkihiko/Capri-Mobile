@@ -25,7 +25,7 @@ jobs:
           SM="$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n1)"
           echo "sdkmanager: $SM"
           yes | "$SM" --licenses >/dev/null 2>&1 || true
-          "$SM" "platforms;android-37" "build-tools;37.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+          "$SM" "platforms;android-37.0" "build-tools;37.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
 
       - name: Build release APK
         run: |
