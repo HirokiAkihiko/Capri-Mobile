@@ -2,7 +2,8 @@ package com.capri.mobile
 
 import kotlin.random.Random
 
-/** What she says when she has no brain yet: short, Night City, never the same line twice in a row. */
+/** What she says when she has no brain yet: short, Night City, never the same line twice in a row. Written in English;
+ * [say] gives them in your language (assets/lang). */
 object Lines {
     val headPoke = listOf("Hey! Watch the optics.", "That's my head, gonk.", "Poke me again. I dare you.",
         "Rude. Very rude.", "You trying to reboot me?", "Ow. Chrome's still chrome, choom.")
@@ -41,6 +42,9 @@ object Lines {
     val woke = listOf("Mm. I'm up, I'm up.", "Back online.", "What'd I miss?")
 
     private val last = HashMap<List<String>, String>()
+
+    /** A line from the list, in your language. */
+    fun say(lines: List<String>) = tr(pick(lines))
 
     fun pick(lines: List<String>): String {
         var s = lines[Random.nextInt(lines.size)]

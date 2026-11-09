@@ -56,9 +56,9 @@ fun BrainTab() {
             delay(500)
         }
     }
-    Segments(listOf("This phone", "LM Studio", "NVIDIA"), page) { page = it }
+    Segments(listOf(tr("This phone"), "LM Studio", "NVIDIA"), page) { page = it }
     if (CapriService.running) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 2.dp)) {
-        Box(Modifier.size(7.dp).background(if ("online" in status) GREEN else PINK, CircleShape))
+        Box(Modifier.size(7.dp).background(if (CapriService.brainOnline) GREEN else PINK, CircleShape))
         Spacer(Modifier.width(8.dp))
         Text(status, color = MUTED, fontFamily = SANS, fontSize = 12.5.sp)
     }
@@ -93,17 +93,16 @@ private fun KeepSafe() {
             was = safe
         }
     }
-    if (safe) Card("Brains are safe") {
+    if (safe) Card(tr("Brains are safe")) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Pill("Kept", GREEN)
+            Pill(tr("Kept"), GREEN)
             Spacer(Modifier.width(10.dp))
-            Text("In ${ModelStore.sharedPath} on your phone. They stay if you delete the app, and a new install finds them.",
+            Text(tr("In {0} on your phone. They stay if you delete the app, and a new install finds them.", ModelStore.sharedPath),
                 color = MUTED, fontFamily = SANS, fontSize = 12.5.sp, lineHeight = 17.sp)
         }
         if (moving.isNotEmpty()) Text(moving, color = INK, fontFamily = SANS, fontSize = 12.sp)
-    } else Card("Keep brains safe", "Deleting the app deletes her brains. Keep them in a Capri folder on your phone: they " +
-        "stay when you delete the app, and a new install picks them up with no downloading. Had Capri before? Tap this and she finds them.") {
-        CapriButton("Keep my brains safe", Modifier.fillMaxWidth(), color = GREEN) {
+    } else Card(tr("Keep brains safe"), tr("Deleting the app deletes her brains. Keep them in a Capri folder on your phone: they stay when you delete the app, and a new install picks them up with no downloading. Had Capri before? Tap this and she finds them.")) {
+        CapriButton(tr("Keep my brains safe"), Modifier.fillMaxWidth(), color = GREEN) {
             if (Build.VERSION.SDK_INT >= 30) {
                 ctx.startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${ctx.packageName}")))
             } else old.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
@@ -127,7 +126,7 @@ private fun PhoneBrains(prefs: Prefs) {
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) thread(name = "capri-import") { importGguf(ctx, uri) { importing = it } }
     }
-    Card("Pick a brain", "She downloads it and runs it offline, on your phone. This phone has about $ram GB of RAM.") {
+    Card(tr("Pick a brain"), tr("She downloads it and runs it offline, on your phone. This phone has about {0} GB of RAM.", ram)) {
         @Suppress("UNUSED_EXPRESSION") tick
         val active = prefs.brain
         for (m in ModelStore.all(ctx)) {
@@ -141,23 +140,23 @@ private fun PhoneBrains(prefs: Prefs) {
                     Text(m.label, color = INK, fontFamily = SANS, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, modifier = Modifier.weight(1f))
                     Text("%.1f GB".format(m.bytes / 1e9), color = MUTED, fontFamily = SANS, fontSize = 12.sp)
                 }
-                Text(m.note + (if (m.minRamGb > 0) "  ·  ${m.minRamGb}+ GB RAM" else ""),
+                Text(tr(m.note) + (if (m.minRamGb > 0) "  ·  ${m.minRamGb}+ GB RAM" else ""),
                     color = if (m.minRamGb > ram) PINK else MUTED, fontFamily = SANS, fontSize = 12.sp)
                 if (busy || (dl.id == m.id && dl.total > 0)) {
                     LinearProgressIndicator(progress = { if (dl.total > 0) dl.done.toFloat() / dl.total else 0f },
                         modifier = Modifier.fillMaxWidth(), color = PINK, trackColor = EDGE)
                     Text(if (busy) "%.2f / %.2f GB  ·  %.1f MB/s".format(dl.done / 1e9, dl.total / 1e9, dl.speed / 1e6)
-                        else "stopped: ${dl.error}", color = MUTED, fontFamily = SANS, fontSize = 11.sp)
+                        else tr("stopped: {0}", dl.error), color = MUTED, fontFamily = SANS, fontSize = 11.sp)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     when {
-                        inUse && m.minRamGb <= ram -> Pill("In use", GREEN)
-                        m.minRamGb > ram -> Pill("Too big for this phone", PINK)
-                        have -> CapriButton("Use", color = GREEN) { prefs.brain = m.id; CapriService.brainChanged(ctx); tick++ }
-                        busy -> CapriButton("Pause", quiet = true) { DownloadService.cancel(ctx) }
-                        else -> CapriButton(if (partial > 0) "Resume" else "Download") { DownloadService.start(ctx, m) }
+                        inUse && m.minRamGb <= ram -> Pill(tr("In use"), GREEN)
+                        m.minRamGb > ram -> Pill(tr("Too big for this phone"), PINK)
+                        have -> CapriButton(tr("Use"), color = GREEN) { prefs.brain = m.id; CapriService.brainChanged(ctx); tick++ }
+                        busy -> CapriButton(tr("Pause"), quiet = true) { DownloadService.cancel(ctx) }
+                        else -> CapriButton(if (partial > 0) tr("Resume") else tr("Download")) { DownloadService.start(ctx, m) }
                     }
-                    if (have || partial > 0) CapriButton("Delete", quiet = true, color = MUTED) {
+                    if (have || partial > 0) CapriButton(tr("Delete"), quiet = true, color = MUTED) {
                         if (busy) DownloadService.cancel(ctx)
                         ModelStore.file(ctx, m).delete(); ModelStore.part(ctx, m).delete()
                         if (prefs.brain == m.id) { prefs.brain = ""; CapriService.brainChanged(ctx) }
@@ -171,17 +170,17 @@ private fun PhoneBrains(prefs: Prefs) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth().border(1.dp, EDGE, chamfer(8.dp)).padding(9.dp)) {
                         Column(Modifier.weight(1f)) {
-                            Text("+ Eyes  ·  %.0f MB".format(m.eyesBytes / 1e6), color = INK, fontFamily = SANS, fontSize = 13.sp)
-                            Text(if (eyesOn) "she can look at your screen" else if (eyesBusy) "%.0f / %.0f MB".format(
-                                dl.done / 1e6, dl.total / 1e6) else "lets her look at your screen (Android 11+)",
+                            Text(tr("+ Eyes  ·  {0} MB", "%.0f".format(m.eyesBytes / 1e6)), color = INK, fontFamily = SANS, fontSize = 13.sp)
+                            Text(if (eyesOn) tr("she can look at your screen") else if (eyesBusy) "%.0f / %.0f MB".format(
+                                dl.done / 1e6, dl.total / 1e6) else tr("lets her look at your screen (Android 11+)"),
                                 color = MUTED, fontFamily = SANS, fontSize = 11.sp)
                         }
                         when {
-                            eyesOn -> CapriButton("Remove", quiet = true, color = MUTED) {
+                            eyesOn -> CapriButton(tr("Remove"), quiet = true, color = MUTED) {
                                 ModelStore.eyes(ctx, m).delete(); CapriService.brainChanged(ctx); tick++
                             }
-                            eyesBusy -> CapriButton("Pause", quiet = true) { DownloadService.cancel(ctx) }
-                            else -> CapriButton(if (eyesPart > 0) "Resume" else "Get", color = GREEN) {
+                            eyesBusy -> CapriButton(tr("Pause"), quiet = true) { DownloadService.cancel(ctx) }
+                            else -> CapriButton(if (eyesPart > 0) tr("Resume") else tr("Get"), color = GREEN) {
                                 DownloadService.start(ctx, m, eyes = true)
                             }
                         }
@@ -189,7 +188,7 @@ private fun PhoneBrains(prefs: Prefs) {
                 }
             }
         }
-        CapriButton("Add your own .gguf", Modifier.fillMaxWidth(), quiet = true) { pick.launch(arrayOf("application/octet-stream", "*/*")) }
+        CapriButton(tr("Add your own .gguf"), Modifier.fillMaxWidth(), quiet = true) { pick.launch(arrayOf("application/octet-stream", "*/*")) }
         if (importing.isNotEmpty()) Text(importing, color = MUTED, fontFamily = SANS, fontSize = 12.sp)
     }
 }
@@ -207,24 +206,24 @@ private fun LmStudioCard(prefs: Prefs) {
 
     fun connect(address: String) {
         working = true
-        note = "Connecting..."
+        note = tr("Connecting...")
         thread(name = "capri-lm") {
             val client = LmStudio(address)
             val found = runCatching { client.models() }.getOrDefault(emptyList())
             models = found
             working = false
-            note = if (found.isEmpty()) "Nothing answered at ${client.base}. Is its server on, with \"Serve on Local Network\"?"
-            else "Connected to ${client.base}"
+            note = if (found.isEmpty()) tr("Nothing answered at {0}. Is its server on, with \"Serve on Local Network\"?", client.base)
+            else tr("Connected to {0}", client.base)
             if (found.isNotEmpty()) { url = client.base; prefs.lmUrl = client.base }
         }
     }
     LaunchedEffect(Unit) { if (url.isNotBlank()) connect(url) }
 
-    Card("LM Studio on your PC", "Run any model on your PC and she thinks with it, over your own Wi-Fi. Nothing to download here.") {
+    Card(tr("LM Studio on your PC"), tr("Run any model on your PC and she thinks with it, over your own Wi-Fi. Nothing to download here.")) {
         val steps = listOf(
-            "On your PC, open LM Studio and load a model. A vision model lets her see your screen.",
-            "Developer tab: start the server and turn on \"Serve on Local Network\".",
-            "Phone and PC on the same Wi-Fi, then tap Find.",
+            tr("On your PC, open LM Studio and load a model. A vision model lets her see your screen."),
+            tr("Developer tab: start the server and turn on \"Serve on Local Network\"."),
+            tr("Phone and PC on the same Wi-Fi, then tap Find."),
         )
         steps.forEachIndexed { i, s ->
             Row {
@@ -232,21 +231,21 @@ private fun LmStudioCard(prefs: Prefs) {
                 Text(s, color = MUTED, fontFamily = SANS, fontSize = 13.sp, lineHeight = 18.sp)
             }
         }
-        OutlinedTextField(url, { url = it }, label = { Text("Address, like 192.168.1.5") }, singleLine = true,
+        OutlinedTextField(url, { url = it }, label = { Text(tr("Address, like 192.168.1.5")) }, singleLine = true,
             colors = capriField(), shape = chamfer(9.dp), modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CapriButton("Find on Wi-Fi", Modifier.weight(1f), quiet = true, enabled = !working) {
+            CapriButton(tr("Find on Wi-Fi"), Modifier.weight(1f), quiet = true, enabled = !working) {
                 working = true
-                note = "Looking on your Wi-Fi..."
+                note = tr("Looking on your Wi-Fi...")
                 thread(name = "capri-lm-find") {
                     val hit = runCatching { LmStudio.find() }.getOrNull()
                     if (hit == null) {
                         working = false
-                        note = "Didn't find it. Check \"Serve on Local Network\", or type your PC's address."
+                        note = tr("Didn't find it. Check \"Serve on Local Network\", or type your PC's address.")
                     } else connect(hit)
                 }
             }
-            CapriButton("Connect", Modifier.weight(1f), enabled = !working && url.isNotBlank()) { connect(url) }
+            CapriButton(tr("Connect"), Modifier.weight(1f), enabled = !working && url.isNotBlank()) { connect(url) }
         }
         if (note.isNotEmpty()) Text(note, color = if (models.isEmpty()) MUTED else INK, fontFamily = SANS, fontSize = 12.sp, lineHeight = 17.sp)
         for (m in models) {
@@ -255,13 +254,13 @@ private fun LmStudioCard(prefs: Prefs) {
                 .clickable { model = m.id; prefs.lmModel = m.id; if (using) CapriService.brainChanged(ctx) }.padding(11.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Text(m.id, color = INK, fontFamily = SANS, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, modifier = Modifier.weight(1f))
-                if (m.vision) Text("Sees", color = PINK, fontFamily = SANS, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
-                if (m.loaded) Text("Loaded", color = CYAN, fontFamily = SANS, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
+                if (m.vision) Text(tr("Sees"), color = PINK, fontFamily = SANS, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
+                if (m.loaded) Text(tr("Loaded"), color = CYAN, fontFamily = SANS, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
             }
         }
         if (models.isNotEmpty()) {
-            if (using) Pill("In use", GREEN)
-            else CapriButton("Use LM Studio", Modifier.fillMaxWidth(), color = GREEN) {
+            if (using) Pill(tr("In use"), GREEN)
+            else CapriButton(tr("Use LM Studio"), Modifier.fillMaxWidth(), color = GREEN) {
                 prefs.brain = ModelStore.LM.id
                 using = true
                 CapriService.brainChanged(ctx)
@@ -289,9 +288,9 @@ private fun NvidiaCard(prefs: Prefs) {
         prefs.nvKey = clean
         good = false
         if (clean.isEmpty()) { note = ""; return }
-        if (!clean.startsWith("nvapi-")) { note = "That isn't an NVIDIA key. A key starts with nvapi- (copy it with the Copy button on NVIDIA's page)."; return }
+        if (!clean.startsWith("nvapi-")) { note = tr("That isn't an NVIDIA key. A key starts with nvapi- (copy it with the Copy button on NVIDIA's page)."); return }
         working = true
-        note = "Checking your key..."
+        note = tr("Checking your key...")
         thread(name = "capri-nv") {
             val (ok, msg) = LmStudio.checkNvidia(clean)
             note = msg
@@ -305,13 +304,12 @@ private fun NvidiaCard(prefs: Prefs) {
         }
     }
 
-    Card("NVIDIA cloud brain", "A huge model in NVIDIA's cloud, free with your own key. Needs internet. What you say to her goes to NVIDIA, " +
-        "and so does your screen when you ask her to look. She sees through NVIDIA's vision model on the same key.") {
+    Card(tr("NVIDIA cloud brain"), tr("A huge model in NVIDIA's cloud, free with your own key. Needs internet. What you say to her goes to NVIDIA, and so does your screen when you ask her to look. She sees through NVIDIA's vision model on the same key.")) {
         val steps = listOf(
-            "Tap Open NVIDIA. Sign in, or make a free account (NVIDIA may ask you to verify your email or phone number).",
-            "On that page tap Get API Key, then Generate Key.",
-            "Tap Copy. The key starts with nvapi-",
-            "Come back here and tap Paste key. She checks it and switches to NVIDIA by herself.",
+            tr("Tap Open NVIDIA. Sign in, or make a free account (NVIDIA may ask you to verify your email or phone number)."),
+            tr("On that page tap Get API Key, then Generate Key."),
+            tr("Tap Copy. The key starts with nvapi-"),
+            tr("Come back here and tap Paste key. She checks it and switches to NVIDIA by herself."),
         )
         steps.forEachIndexed { i, s ->
             Row {
@@ -320,33 +318,31 @@ private fun NvidiaCard(prefs: Prefs) {
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CapriButton("Open NVIDIA", Modifier.weight(1f), quiet = true) { uri.openUri(ModelStore.NV_KEY_PAGE) }
-            CapriButton("Paste key", Modifier.weight(1f), color = GREEN, enabled = !working) {
+            CapriButton(tr("Open NVIDIA"), Modifier.weight(1f), quiet = true) { uri.openUri(ModelStore.NV_KEY_PAGE) }
+            CapriButton(tr("Paste key"), Modifier.weight(1f), color = GREEN, enabled = !working) {
                 val clip = ctx.getSystemService(android.content.ClipboardManager::class.java)
                 val text = clip?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty()
-                if (text.isBlank()) note = "Nothing copied yet. On NVIDIA's page tap Copy next to your key, then come back."
+                if (text.isBlank()) note = tr("Nothing copied yet. On NVIDIA's page tap Copy next to your key, then come back.")
                 else check(text)
             }
         }
-        OutlinedTextField(key, { key = it; prefs.nvKey = tidy(it); note = ""; good = false }, label = { Text("or type it here: nvapi-...") }, singleLine = true,
+        OutlinedTextField(key, { key = it; prefs.nvKey = tidy(it); note = ""; good = false }, label = { Text(tr("or type it here: nvapi-...")) }, singleLine = true,
             visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
             colors = capriField(), shape = chamfer(9.dp), modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            CapriButton(if (working) "Checking..." else "Check key", Modifier.weight(1f), quiet = true, enabled = !working && key.isNotBlank()) { check(key) }
-            if (using) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Pill("In use", GREEN) }
-            else CapriButton("Use it", Modifier.weight(1f), color = GREEN, enabled = key.isNotBlank() && !working) {
+            CapriButton(if (working) tr("Checking...") else tr("Check key"), Modifier.weight(1f), quiet = true, enabled = !working && key.isNotBlank()) { check(key) }
+            if (using) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Pill(tr("In use"), GREEN) }
+            else CapriButton(tr("Use it"), Modifier.weight(1f), color = GREEN, enabled = key.isNotBlank() && !working) {
                 prefs.brain = ModelStore.NV.id
                 using = true
                 CapriService.brainChanged(ctx)
             }
         }
         if (note.isNotEmpty()) Text(note, color = if (good) INK else PINK, fontFamily = SANS, fontSize = 12.5.sp, lineHeight = 17.sp)
-        Text("Still not working? Copy the whole key again, check you're online, and make sure your NVIDIA account is verified. " +
-            "If NVIDIA's biggest model is busy she switches to a smaller NVIDIA model by herself.",
+        Text(tr("Still not working? Copy the whole key again, check you're online, and make sure your NVIDIA account is verified. If NVIDIA's biggest model is busy she switches to a smaller NVIDIA model by herself."),
             color = MUTED, fontFamily = SANS, fontSize = 12.sp, lineHeight = 16.sp)
         var glance by remember { mutableStateOf(prefs.cloudGlance) }
-        Toggle("Let her look on her own", "with this on, React on her own works in every app here too: your screen, " +
-            "chats and DMs included, goes to NVIDIA every minute or two. Off: only public feeds like TikTok, and only their text.", glance) {
+        Toggle(tr("Let her look on her own"), tr("with this on, React on her own works in every app here too: your screen, chats and DMs included, goes to NVIDIA every minute or two. Off: only public feeds like TikTok, and only their text."), glance) {
             glance = it
             prefs.cloudGlance = it
         }
@@ -365,20 +361,20 @@ private fun EarsCard() {
     val ready = ModelStore.earsReady(ctx)
     val total = m.bytes + m.eyesBytes
     val busy = (dl.id == m.id || dl.id == m.id + ":eyes") && dl.error.isEmpty()
-    Card("Her ears", "Qwen3-ASR: hears names, slang and accents in 52 languages, right on your phone. Without it she uses your phone's speech recognizer.") {
+    Card(tr("Her ears"), tr("Qwen3-ASR: hears names, slang and accents in 52 languages, right on your phone. Without it she uses your phone's speech recognizer.")) {
         if (busy) {
             LinearProgressIndicator(progress = { if (dl.total > 0) dl.done.toFloat() / dl.total else 0f }, modifier = Modifier.fillMaxWidth(), color = PINK, trackColor = EDGE)
             Text("%.0f / %.0f MB".format(dl.done / 1e6, dl.total / 1e6), color = MUTED, fontFamily = SANS, fontSize = 12.sp)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             when {
-                ready -> Pill("Ready", GREEN)
-                busy -> CapriButton("Pause", quiet = true) { DownloadService.cancel(ctx) }
-                else -> CapriButton("Download  ·  %.1f GB".format(total / 1e9)) {
+                ready -> Pill(tr("Ready"), GREEN)
+                busy -> CapriButton(tr("Pause"), quiet = true) { DownloadService.cancel(ctx) }
+                else -> CapriButton(tr("Download  ·  {0} GB", "%.1f".format(total / 1e9))) {
                     DownloadService.start(ctx, m, eyes = ModelStore.installed(ctx, m))
                 }
             }
-            if (ready) CapriButton("Delete", quiet = true, color = MUTED) {
+            if (ready) CapriButton(tr("Delete"), quiet = true, color = MUTED) {
                 ModelStore.file(ctx, m).delete(); ModelStore.eyes(ctx, m).delete(); tick++
             }
         }
@@ -394,19 +390,19 @@ private fun MemoryCard(prefs: Prefs) {
     var sure by remember { mutableStateOf(false) }
     var tick by remember { mutableIntStateOf(0) }
     val facts = remember(tick) { memory.all() }
-    Card("Her memory", "What she remembers about you and the people in your life. ${facts.size} ${if (facts.size == 1) "memory" else "memories"}, only on this phone.") {
+    Card(tr("Her memory"), tr("What she remembers about you and the people in your life. Memories: {0}, only on this phone.", facts.size)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Remember things", color = INK, fontFamily = SANS, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Text(tr("Remember things"), color = INK, fontFamily = SANS, fontSize = 14.sp, modifier = Modifier.weight(1f))
             Switch(remembers, { remembers = it; prefs.remember = it }, colors = capriSwitch())
         }
-        if (facts.isEmpty()) Text("Nothing yet. Tell her about your day, or hold her and say \"look at this\".",
+        if (facts.isEmpty()) Text(tr("Nothing yet. Tell her about your day, or hold her and say \"look at this\"."),
             color = MUTED, fontFamily = SANS, fontSize = 12.sp)
         for (f in facts.take(60)) Row(verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().background(PANEL_HI, chamfer(7.dp)).padding(start = 10.dp)) {
             Text(f.text, color = INK, fontFamily = SANS, fontSize = 13.sp, lineHeight = 17.sp, modifier = Modifier.weight(1f).padding(vertical = 6.dp))
             Text("X", color = PINK, fontFamily = MONO, fontSize = 15.sp, modifier = Modifier.clickable { memory.forget(f.text); tick++ }.padding(12.dp))
         }
-        if (facts.isNotEmpty()) CapriButton(if (sure) "Tap again: wipe it all" else "Forget everything", quiet = !sure) {
+        if (facts.isNotEmpty()) CapriButton(if (sure) tr("Tap again: wipe it all") else tr("Forget everything"), quiet = !sure) {
             if (sure) { memory.forgetAll(); sure = false; tick++ } else sure = true
         }
     }
@@ -423,8 +419,8 @@ private fun importGguf(ctx: android.content.Context, uri: Uri, progress: (String
             c.getColumnIndex(OpenableColumns.SIZE).takeIf { it >= 0 }?.let { size = c.getLong(it) }
         }
     }
-    if (!name.endsWith(".gguf", true)) { progress("That's not a .gguf file."); return }
-    if ("mmproj" in name.lowercase()) { progress("That's a vision add-on (mmproj), not a brain."); return }
+    if (!name.endsWith(".gguf", true)) { progress(tr("That's not a .gguf file.")); return }
+    if ("mmproj" in name.lowercase()) { progress(tr("That's a vision add-on (mmproj), not a brain.")); return }
     val out = File(ModelStore.dir(ctx), name)
     val tmp = File(out.path + ".part")
     try {
@@ -438,15 +434,15 @@ private fun importGguf(ctx: android.content.Context, uri: Uri, progress: (String
                     if (n < 0) break
                     o.write(buf, 0, n)
                     done += n
-                    if (done - last > 50_000_000) { last = done; progress("Copying $name: %.2f GB".format(done / 1e9) +
-                        if (size > 0) " of %.2f".format(size / 1e9) else "") }
+                    if (done - last > 50_000_000) { last = done; progress(tr("Copying {0}: {1} GB", name, "%.2f".format(done / 1e9) +
+                        if (size > 0) " / %.2f".format(size / 1e9) else "")) }
                 }
             }
         }
         tmp.renameTo(out)
-        progress("Added $name. Tap Use on it.")
+        progress(tr("Added {0}. Tap Use on it.", name))
     } catch (e: Exception) {
         tmp.delete()
-        progress("Couldn't copy it: ${e.message}")
+        progress(tr("Couldn't copy it: {0}", e.message))
     }
 }

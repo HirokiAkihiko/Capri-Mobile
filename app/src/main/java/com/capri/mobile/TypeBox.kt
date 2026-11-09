@@ -38,7 +38,7 @@ class TypeBox(context: Context, dp: Float, private val send: (String) -> Unit, p
         }
         val font = runCatching { ResourcesCompat.getFont(context, R.font.manrope_regular) }.getOrNull() ?: Typeface.DEFAULT
         field.apply {
-            hint = "Type to her..."
+            hint = tr("Type to her...")
             typeface = font
             textSize = 15f
             setTextColor(Color.BLACK)
@@ -53,7 +53,7 @@ class TypeBox(context: Context, dp: Float, private val send: (String) -> Unit, p
         }
         addView(field, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         val button = TextView(this.context).apply {
-            text = "Send"
+            text = tr("Send")
             typeface = runCatching { ResourcesCompat.getFont(context, R.font.manrope_extrabold) }.getOrNull() ?: Typeface.DEFAULT_BOLD
             textSize = 14f
             setTextColor(Color.WHITE)

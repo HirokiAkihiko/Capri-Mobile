@@ -69,7 +69,7 @@ class DownloadService : Service() {
         runCatching { part.parentFile?.mkdirs() }
         val room = runCatching { (part.parentFile ?: m.file.parentFile)!!.usableSpace }.getOrDefault(Long.MAX_VALUE)
         if (room < m.bytes - part.length() + 300_000_000L) {  // say so now instead of failing at 90%
-            err = "not enough space: free up about %.1f GB on your phone".format((m.bytes - part.length() + 300_000_000L - room) / 1e9)
+            err = tr("not enough space: free up about {0} GB on your phone", "%.1f".format((m.bytes - part.length() + 300_000_000L - room) / 1e9))
             tries = 99
         }
         while (!cancel && part.length() < m.bytes && tries < 40) {
@@ -83,7 +83,7 @@ class DownloadService : Service() {
                 c.setRequestProperty("User-Agent", "CapriMobile/0.3")
                 if (have > 0) c.setRequestProperty("Range", "bytes=$have-")
                 val code = c.responseCode
-                if (code == 404 || code == 403 || code == 401) { err = "download link is dead ($code)"; break }
+                if (code == 404 || code == 403 || code == 401) { err = tr("download link is dead ({0})", code); break }
                 val append = have > 0 && code == 206
                 FileOutputStream(part, append).use { out ->
                     var done = if (append) have else 0L
@@ -110,11 +110,11 @@ class DownloadService : Service() {
                 tries = 0
             } catch (e: Exception) {
                 err = when (e) {
-                    is java.net.UnknownHostException -> "no internet connection"
-                    is java.io.IOException -> if ("ENOSPC" in e.message.orEmpty()) "your phone is out of space" else "connection dropped, retrying"
+                    is java.net.UnknownHostException -> tr("no internet connection")
+                    is java.io.IOException -> if ("ENOSPC" in e.message.orEmpty()) tr("your phone is out of space") else tr("connection dropped, retrying")
                     else -> e.message ?: e.javaClass.simpleName
                 }
-                if ("out of space" in err) break
+                if ("ENOSPC" in e.message.orEmpty()) break
                 Thread.sleep(minOf(30_000L, 2000L * tries))
             }
         }
@@ -126,7 +126,7 @@ class DownloadService : Service() {
             if (ears && !m.eyes) handler.post { start(this, m.model, eyes = true) }  // her ears are two files
         }
         state.value = State(if (ok) "" else m.id, part.length(), m.bytes, 0,
-            if (ok) "" else if (cancel) "paused" else err.ifEmpty { "stopped" })
+            if (ok) "" else if (cancel) tr("paused") else err.ifEmpty { tr("stopped") })
         if (ok) CapriService.brainChanged(this)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -135,13 +135,13 @@ class DownloadService : Service() {
     private fun notify(label: String, done: Long, total: Long, speed: Long, first: Boolean = false) {
         val nm = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL, "Brain downloads", NotificationManager.IMPORTANCE_LOW))
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, tr("Brain downloads"), NotificationManager.IMPORTANCE_LOW))
         }
         val pct = if (total > 0) (done * 100 / total).toInt() else 0
         val n = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_capri_stat)
-            .setContentTitle("Downloading $label")
-            .setContentText("%.2f of %.2f GB  ·  %.1f MB/s".format(done / 1e9, total / 1e9, speed / 1e6))
+            .setContentTitle(tr("Downloading {0}", label))
+            .setContentText("%.2f / %.2f GB  ·  %.1f MB/s".format(done / 1e9, total / 1e9, speed / 1e6))
             .setProgress(100, pct, false)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

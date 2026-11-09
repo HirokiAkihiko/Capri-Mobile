@@ -162,6 +162,9 @@ private fun restart(ctx: Context) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun App() {
+    val ctx = LocalContext.current
+    var picked by remember { mutableStateOf(Prefs(ctx).lang.isNotEmpty()) }
+    if (!picked) { FirstLanguage { picked = true }; return }
     var tab by remember { mutableStateOf(Tab.HOME) }
     var tick by remember { mutableIntStateOf(0) }  // permissions / her state, re-read on resume and every couple of seconds
     val owner = LocalLifecycleOwner.current
@@ -199,15 +202,47 @@ private fun App() {
     }
 }
 
+/** The first time you open the app: pick her language (the page switches as you tap). */
+@Composable
+private fun FirstLanguage(done: () -> Unit) {
+    val ctx = LocalContext.current
+    var pick by remember { mutableStateOf(Lang.system()) }
+    LaunchedEffect(Unit) { Lang.set(ctx, pick) }
+    Column(Modifier.fillMaxSize().background(BG).statusBarsPadding().navigationBarsPadding()
+        .verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Capri", fontFamily = SANS, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = INK)
+        Card(tr("Pick her language"), tr("She talks to you in it, and the app uses it too. You can change it later in Setup.")) {
+            Languages(pick) { pick = it; Lang.set(ctx, it) }
+        }
+        CapriButton(tr("Continue"), Modifier.fillMaxWidth()) { Lang.set(ctx, pick); done() }
+    }
+}
+
+/** Every language she speaks, plus Auto (the phone's). */
+@Composable
+fun Languages(selected: String, pick: (String) -> Unit) {
+    val options = listOf("auto" to tr("Auto: same as the phone ({0})", Lang.all[Lang.system()])) + Lang.all.toList()
+    for ((code, name) in options) {
+        val sel = code == selected
+        Row(Modifier.fillMaxWidth().clip(chamfer(8.dp)).background(if (sel) PANEL_HI else Color.Transparent)
+            .border(1.dp, if (sel) PINK else EDGE, chamfer(8.dp)).clickable { pick(code) }.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(name, color = INK, fontFamily = SANS, fontWeight = if (sel) FontWeight.ExtraBold else FontWeight.Normal,
+                fontSize = 15.sp, modifier = Modifier.weight(1f))
+            if (sel) LineIcon("check", PINK, 18.dp)
+        }
+    }
+}
+
 // -- pieces -------------------------------------------------------------------------------------------------------
 @Composable
 private fun Header(tick: Int, tab: Tab) {
     val on = remember(tick) { CapriService.running }
     Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Text(if (tab == Tab.HOME) "Capri" else tab.label, fontFamily = SANS, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp,
+        Text(if (tab == Tab.HOME) "Capri" else tr(tab.label), fontFamily = SANS, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp,
             color = INK, modifier = Modifier.weight(1f))
-        Pill(if (on) "On screen" else "Offline", if (on) GREEN else MUTED)
+        Pill(if (on) tr("On screen") else tr("Offline"), if (on) GREEN else MUTED)
     }
 }
 
@@ -231,7 +266,7 @@ private fun TabBar(tab: Tab, pick: (Tab) -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally) {
                     LineIcon(t.icon, if (sel) PINK else MUTED, 22.dp)
                     Spacer(Modifier.height(3.dp))
-                    Text(t.label, fontFamily = SANS, fontWeight = if (sel) FontWeight.ExtraBold else FontWeight.Normal,
+                    Text(tr(t.label), fontFamily = SANS, fontWeight = if (sel) FontWeight.ExtraBold else FontWeight.Normal,
                         fontSize = 11.sp, color = if (sel) PINK else MUTED)
                 }
             }
@@ -413,10 +448,10 @@ private fun HomeTab(tick: Int, go: (Tab) -> Unit) {
     val uri = LocalUriHandler.current
     var update by remember(tick) { mutableStateOf(Updates.waiting(ctx, prefs)) }
 
-    if (update.isNotEmpty()) Card("New update", "Version ${update.removePrefix("v")} is out on GitHub.") {
+    if (update.isNotEmpty()) Card(tr("New update"), tr("Version {0} is out on GitHub.", update.removePrefix("v"))) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CapriButton("Get it", Modifier.weight(1f)) { uri.openUri(Updates.PAGE) }
-            CapriButton("Later", Modifier.weight(1f), quiet = true) { prefs.updateSkipped = update; update = "" }
+            CapriButton(tr("Get it"), Modifier.weight(1f)) { uri.openUri(Updates.PAGE) }
+            CapriButton(tr("Later"), Modifier.weight(1f), quiet = true) { prefs.updateSkipped = update; update = "" }
         }
     }
     Box(Modifier.fillMaxWidth().height(330.dp).background(STAGE, chamfer(16.dp)).border(1.dp, EDGE, chamfer(16.dp))) {
@@ -424,33 +459,33 @@ private fun HomeTab(tick: Int, go: (Tab) -> Unit) {
         Capri(skin, Modifier.fillMaxSize().padding(vertical = 20.dp))
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(if (on) "She's out, choom." else if (canDraw) "Ready when you are." else "One step first.",
+        Text(if (on) tr("She's out, choom.") else if (canDraw) tr("Ready when you are.") else tr("One step first."),
             fontFamily = SANS, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, color = INK)
-        Text(if (on) status else "Brain: " + (brain?.label ?: "none yet"), fontFamily = SANS, fontSize = 13.sp, color = MUTED)
+        Text(if (on) status else tr("Brain: {0}", brain?.label ?: tr("none yet")), fontFamily = SANS, fontSize = 13.sp, color = MUTED)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             when {
-                !canDraw -> CapriButton("Let her on screen", Modifier.weight(1f)) {
+                !canDraw -> CapriButton(tr("Let her on screen"), Modifier.weight(1f)) {
                     ctx.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}")))
                 }
                 on -> {
-                    CapriButton("Jack out", Modifier.weight(1f)) { ctx.stopService(Intent(ctx, CapriService::class.java)); on = false }
-                    CapriButton("Nap", Modifier.weight(1f), quiet = true) {
+                    CapriButton(tr("Jack out"), Modifier.weight(1f)) { ctx.stopService(Intent(ctx, CapriService::class.java)); on = false }
+                    CapriButton(tr("Nap"), Modifier.weight(1f), quiet = true) {
                         ctx.startService(Intent(ctx, CapriService::class.java).setAction(CapriService.ACTION_NAP))
                     }
                 }
-                else -> CapriButton("Summon", Modifier.weight(1f)) { summon(ctx); on = true }
+                else -> CapriButton(tr("Summon"), Modifier.weight(1f)) { summon(ctx); on = true }
             }
         }
     }
-    if (!canDraw || brain == null || !access) Card("Get her ready") {
-        Step("Let her on screen", "\"Display over other apps\", so she can float over everything", canDraw)
-        Step("Give her a brain", "On this phone, LM Studio on your PC, or NVIDIA's free cloud", brain != null) { go(Tab.BRAIN) }
-        Step("Let her see", "Accessibility: sit on icons, react to your apps, look at your screen", access) { go(Tab.SETUP) }
+    if (!canDraw || brain == null || !access) Card(tr("Get her ready")) {
+        Step(tr("Let her on screen"), tr("\"Display over other apps\", so she can float over everything"), canDraw)
+        Step(tr("Give her a brain"), tr("On this phone, LM Studio on your PC, or NVIDIA's free cloud"), brain != null) { go(Tab.BRAIN) }
+        Step(tr("Let her see"), tr("Accessibility: sit on icons, react to your apps, look at your screen"), access) { go(Tab.SETUP) }
     }
-    if (brain == null && !ModelStore.canShare(ctx)) Card("Had Capri before?") {
-        Step("Find your brains", "Kept your brains safe last time? She finds them with no downloading", false) { go(Tab.BRAIN) }
+    if (brain == null && !ModelStore.canShare(ctx)) Card(tr("Had Capri before?")) {
+        Step(tr("Find your brains"), tr("Kept your brains safe last time? She finds them with no downloading"), false) { go(Tab.BRAIN) }
     }
-    if (memories.isNotEmpty()) Card("She remembers") {
+    if (memories.isNotEmpty()) Card(tr("She remembers")) {
         for (m in memories) Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(vertical = 2.dp)) {
             Box(Modifier.padding(top = 7.dp).size(5.dp).background(PINK, CircleShape))
             Spacer(Modifier.width(8.dp))
@@ -500,18 +535,17 @@ private fun SetupTab(tick: Int, refresh: () -> Unit) {
     var name by remember { mutableStateOf(prefs.userName) }
 
     var crash by remember { mutableStateOf(CrashLog.last(ctx)) }
-    if (crash.isNotEmpty()) Card("She crashed last time", "Sorry! Copy this report and send it to us in #suggestions with the bug tag. " +
-        "It only has your phone model, Android version and what went wrong.") {
+    if (crash.isNotEmpty()) Card(tr("She crashed last time"), tr("Sorry! Copy this report and send it to us in #suggestions with the bug tag. It only has your phone model, Android version and what went wrong.")) {
         Text(crash.take(500), color = MUTED, fontFamily = MONO, fontSize = 11.sp, lineHeight = 14.sp)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CapriButton("Copy report", Modifier.weight(1f), color = GREEN) {
+            CapriButton(tr("Copy report"), Modifier.weight(1f), color = GREEN) {
                 ctx.getSystemService(android.content.ClipboardManager::class.java)
                     ?.setPrimaryClip(android.content.ClipData.newPlainText("Capri crash report", crash))
             }
-            CapriButton("Dismiss", Modifier.weight(1f), quiet = true) { CrashLog.clear(ctx); crash = "" }
+            CapriButton(tr("Dismiss"), Modifier.weight(1f), quiet = true) { CrashLog.clear(ctx); crash = "" }
         }
     }
-    Card("Permissions") {
+    Card(tr("Permissions")) {
         @Composable
         fun line(title: String, ok: Boolean, why: String, fix: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
@@ -521,35 +555,39 @@ private fun SetupTab(tick: Int, refresh: () -> Unit) {
                     Text(title, color = INK, fontFamily = SANS, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     Text(why, color = MUTED, fontFamily = SANS, fontSize = 12.sp, lineHeight = 16.sp)
                 }
-                if (!ok) CapriButton("Allow", onClick = fix)
+                if (!ok) CapriButton(tr("Allow"), onClick = fix)
             }
         }
-        line("Draw over apps", canDraw, "so she can float on your screen") {
+        line(tr("Draw over apps"), canDraw, tr("so she can float on your screen")) {
             ctx.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}")))
         }
-        line("Microphone", micOk, "so she hears you while you hold her") { mic.launch(Manifest.permission.RECORD_AUDIO) }
-        line("Accessibility", access, "sit on icons, react to your apps, look at your screen") {
+        line(tr("Microphone"), micOk, tr("so she hears you while you hold her")) { mic.launch(Manifest.permission.RECORD_AUDIO) }
+        line(tr("Accessibility"), access, tr("sit on icons, react to your apps, look at your screen")) {
             ctx.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
         if (!access) {
-            Text("Greyed out? App info > ⋮ > Allow restricted settings, then try again.", color = MUTED, fontFamily = SANS, fontSize = 12.sp)
-            CapriButton("App info", quiet = true) {
+            Text(tr("Greyed out? App info > ⋮ > Allow restricted settings, then try again."), color = MUTED, fontFamily = SANS, fontSize = 12.sp)
+            CapriButton(tr("App info"), quiet = true) {
                 ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")))
             }
         }
     }
-    Card("Theme") {
-        Segments(listOf("Light", "Dark"), if (Look.dark) 1 else 0) { i ->
+    Card(tr("Language"), tr("She talks to you in this language, and the app uses it too.")) {
+        var lang by remember { mutableStateOf(prefs.lang.ifEmpty { "auto" }) }
+        Languages(lang) { if (it != lang) { lang = it; Lang.set(ctx, it); restart(ctx) } }
+    }
+    Card(tr("Theme")) {
+        Segments(listOf(tr("Light"), tr("Dark")), if (Look.dark) 1 else 0) { i ->
             Look.dark = i == 1
             prefs.dark = Look.dark
             (ctx as? MainActivity)?.bars()
         }
     }
-    Card("You") {
-        OutlinedTextField(name, { name = it; prefs.userName = it.trim() }, label = { Text("What she calls you") }, singleLine = true,
+    Card(tr("You")) {
+        OutlinedTextField(name, { name = it; prefs.userName = it.trim() }, label = { Text(tr("What she calls you")) }, singleLine = true,
             colors = capriField(), shape = chamfer(9.dp), modifier = Modifier.fillMaxWidth())
     }
-    Card("Her look") {
+    Card(tr("Her look")) {
         val seen = skin == "watcher" || prefs.watcherSeen
         Segments(listOf("Capri", if (seen) "Watcher" else "???"), if (skin == "watcher") 1 else 0) { i ->
             val pick = if (i == 1) "watcher" else "capri"
@@ -560,42 +598,41 @@ private fun SetupTab(tick: Int, refresh: () -> Unit) {
                 restart(ctx)
             }
         }
-        if (skin == "watcher") Text("The Watcher doesn't talk. It just watches.", color = MUTED, fontFamily = SANS, fontSize = 12.sp)
+        if (skin == "watcher") Text(tr("The Watcher doesn't talk. It just watches."), color = MUTED, fontFamily = SANS, fontSize = 12.sp)
     }
-    Card("Her behaviour") {
-        Toggle("Always mini", "she stays small, just her eyes. Drag them anywhere: tap to type, hold to talk, double tap to annoy her",
+    Card(tr("Her behaviour")) {
+        Toggle(tr("Always mini"), tr("she stays small, just her eyes. Drag them anywhere: tap to type, hold to talk, double tap to annoy her"),
             mini) { mini = it; prefs.mini = it; CapriService.miniChanged(ctx) }
-        if (!mini) Toggle("Mini moods", "now and then she goes mini by herself for a few minutes", moods) { moods = it; prefs.moods = it }
-        Toggle("Roam", "zaps to a new spot every half a minute or so", roam) { roam = it; prefs.roam = it }
-        Toggle("Talk", "greetings, reactions, battery and charger lines", talk) { talk = it; prefs.talk = it }
-        Toggle("Blips", "soft ticks while she types", blips) { blips = it; prefs.blips = it }
-        Toggle("Tilt slide", "she slides to the low side when you tilt your phone", tilt) { tilt = it; prefs.tilt = it }
-        Toggle("Shake", "shake her dizzy; a hard shake throws her", shake) { shake = it; prefs.shake = it }
-        Toggle("React on her own", "every minute or two she glances at whatever app you're in and says something. " +
-            "Skips banking, wallet and password apps and login screens. Needs a brain + accessibility. Never stored.", feed) { feed = it; prefs.feed = it }
+        if (!mini) Toggle(tr("Mini moods"), tr("now and then she goes mini by herself for a few minutes"), moods) { moods = it; prefs.moods = it }
+        Toggle(tr("Roam"), tr("zaps to a new spot every half a minute or so"), roam) { roam = it; prefs.roam = it }
+        Toggle(tr("Talk"), tr("greetings, reactions, battery and charger lines"), talk) { talk = it; prefs.talk = it }
+        Toggle(tr("Blips"), tr("soft ticks while she types"), blips) { blips = it; prefs.blips = it }
+        Toggle(tr("Tilt slide"), tr("she slides to the low side when you tilt your phone"), tilt) { tilt = it; prefs.tilt = it }
+        Toggle(tr("Shake"), tr("shake her dizzy; a hard shake throws her"), shake) { shake = it; prefs.shake = it }
+        Toggle(tr("React on her own"), tr("every minute or two she glances at whatever app you're in and says something. Skips banking, wallet and password apps and login screens. Needs a brain + accessibility. Never stored."), feed) { feed = it; prefs.feed = it }
     }
-    Card("Chat bubble", "How her speech bubble looks on your screen.") {
-        Segments(listOf("Classic", "Light", "Dark"), bubbleStyle) { bubbleStyle = it; prefs.bubbleStyle = it }
+    Card(tr("Chat bubble"), tr("How her speech bubble looks on your screen.")) {
+        Segments(listOf(tr("Classic"), tr("Light"), tr("Dark")), bubbleStyle) { bubbleStyle = it; prefs.bubbleStyle = it }
     }
-    Card("Size", "${size.toInt()} dp tall") {
+    Card(tr("Size"), tr("{0} dp tall", size.toInt())) {
         Slider(value = size, onValueChange = { size = it }, valueRange = 90f..240f,
             onValueChangeFinished = { prefs.sizeDp = size.toInt(); restart(ctx) },  // she reloads at the new size
             colors = SliderDefaults.colors(thumbColor = PINK, activeTrackColor = PINK, inactiveTrackColor = EDGE))
     }
-    Card("How to play") {
+    Card(tr("How to play")) {
         val moves = listOf(
-            "Tap" to "a little box opens: type to her, over any app (or Chat in her notification)",
-            "Double tap" to "a poke. head: annoyed. body: a hop. keep going and she storms off",
-            "Hold" to "talk to her with your voice (with a brain) / nap (without)",
-            "Drag" to "pick her up, let go to throw. fling her into an edge and she peeks",
-            "Shake" to "she gets dizzy. a hard shake throws her",
-            "Tilt" to "she slides to the low side",
-            "Look" to "say \"look at this\" and she checks your screen",
-            "Nap" to "tap her while she's lying down to wake her",
-            "Mini" to "Always mini (above) keeps her small, just her eyes",
+            tr("Tap") to tr("a little box opens: type to her, over any app (or Chat in her notification)"),
+            tr("Double tap") to tr("a poke. head: annoyed. body: a hop. keep going and she storms off"),
+            tr("Hold") to tr("talk to her with your voice (with a brain) / nap (without)"),
+            tr("Drag") to tr("pick her up, let go to throw. fling her into an edge and she peeks"),
+            tr("Shake") to tr("she gets dizzy. a hard shake throws her"),
+            tr("Tilt") to tr("she slides to the low side"),
+            tr("Look") to tr("say \"look at this\" and she checks your screen"),
+            tr("Nap") to tr("tap her while she's lying down to wake her"),
+            tr("Mini") to tr("Always mini (above) keeps her small, just her eyes"),
         )
         for ((k, v) in moves) Row(Modifier.padding(vertical = 2.dp)) {
-            Text(k, color = INK, fontFamily = SANS, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.width(82.dp))
+            Text(k, color = INK, fontFamily = SANS, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.width(92.dp))
             Text(v, color = MUTED, fontFamily = SANS, fontSize = 13.sp, lineHeight = 18.sp)
         }
     }
@@ -607,32 +644,27 @@ private fun AboutTab() {
     val ctx = LocalContext.current
     val uri = LocalUriHandler.current
     val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull().orEmpty() }
-    Card("Fan-made", "Capri is an unofficial fan project, made for fun and given away free. It is not made, endorsed " +
-        "or sponsored by CD PROJEKT RED or Studio Trigger, and it's not for sale.")
-    Card("Credits") {
+    Card(tr("Fan-made"), tr("Capri is an unofficial fan project, made for fun and given away free. It is not made, endorsed or sponsored by CD PROJEKT RED or Studio Trigger, and it's not for sale."))
+    Card(tr("Credits")) {
         val credits = listOf(
-            "Capri, Cyberpunk & Edgerunners" to "Capri, Cyberpunk: Edgerunners and Cyberpunk 2077 are trademarks and characters of CD PROJEKT S.A. Cyberpunk is a trademark of R. Talsorian Games. All rights to them stay with their owners.",
-            "Art" to "Capri's art, her mini form, the Watcher and the intro by xilia_world00 (Discord): no official art, audio or logos are in this app.",
-            "Model training" to "The CapriAI2 models, the ones trained to be Capri, by ghasty3 (github.com/ghasty3).",
-            "Brains" to "llama.cpp by ggml-org (MIT). Her ears: Qwen3-ASR by the Qwen team (Apache 2.0). Conversational 7B by xiaoheiqaq. Each model keeps its own license (Qwen, NVIDIA Nemotron): see its Hugging Face page.",
-            "Fonts" to "Manrope, Share Tech Mono and Fraunces (SIL Open Font License).",
-            "This app" to "Code under the PolyForm Noncommercial License 1.0.0: free to use and share, never for sale.",
-            "Thanks" to "Lachy (github.com/lachydotmcg), whose sprite art the first versions used.",
-            "Made by" to "the Capri crew. First Capri on a phone, ever.",
+            tr("Capri, Cyberpunk & Edgerunners") to tr("Capri, Cyberpunk: Edgerunners and Cyberpunk 2077 are trademarks and characters of CD PROJEKT S.A. Cyberpunk is a trademark of R. Talsorian Games. All rights to them stay with their owners."),
+            tr("Art") to tr("Capri's art, her mini form, the Watcher and the intro by xilia_world00 (Discord): no official art, audio or logos are in this app."),
+            tr("Model training") to tr("The CapriAI2 models, the ones trained to be Capri, by ghasty3 (github.com/ghasty3)."),
+            tr("Brains") to tr("llama.cpp by ggml-org (MIT). Her ears: Qwen3-ASR by the Qwen team (Apache 2.0). Conversational 7B by xiaoheiqaq. Each model keeps its own license (Qwen, NVIDIA Nemotron): see its Hugging Face page."),
+            tr("Fonts") to tr("Manrope, Share Tech Mono and Fraunces (SIL Open Font License)."),
+            tr("This app") to tr("Code under the PolyForm Noncommercial License 1.0.0: free to use and share, never for sale."),
+            tr("Thanks") to tr("Lachy (github.com/lachydotmcg), whose sprite art the first versions used."),
+            tr("Made by") to tr("the Capri crew. First Capri on a phone, ever."),
         )
         for ((k, v) in credits) Column(Modifier.padding(vertical = 3.dp)) {
             Text(k, color = INK, fontFamily = SANS, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             Text(v, color = MUTED, fontFamily = SANS, fontSize = 12.5.sp, lineHeight = 18.sp)
         }
     }
-    Card("Privacy", "No accounts, no analytics, no servers of ours. A brain on the phone runs offline once downloaded. " +
-        "With LM Studio, what you say and what she looks at go only to your own PC over your own Wi-Fi. With NVIDIA, what " +
-        "you say goes to NVIDIA, and so does your screen when you ask her to look, or by itself only if you switch on \"Let her look on her own\" in the Brain tab. Your key stays on this phone. The only other network use is downloading what you pick and, on Wi-Fi, asking GitHub if there's a new version. Her memories stay in the app's private storage (see them in the Brain " +
-        "tab). Accessibility (optional) is only used to find icons to sit on, see which app is open, react to what's on your screen " +
-        "(React on her own) and look at it when you ask. Speech stays on the phone with her Qwen ears; otherwise it goes through your phone's own recognizer.")
+    Card(tr("Privacy"), tr("No accounts, no analytics, no servers of ours. A brain on the phone runs offline once downloaded. With LM Studio, what you say and what she looks at go only to your own PC over your own Wi-Fi. With NVIDIA, what you say goes to NVIDIA, and so does your screen when you ask her to look, or by itself only if you switch on \"Let her look on her own\" in the Brain tab. Your key stays on this phone. The only other network use is downloading what you pick and, on Wi-Fi, asking GitHub if there's a new version. Her memories stay in the app's private storage (see them in the Brain tab). Accessibility (optional) is only used to find icons to sit on, see which app is open, react to what's on your screen (React on her own) and look at it when you ask. Speech stays on the phone with her Qwen ears; otherwise it goes through your phone's own recognizer."))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         CapriButton("GitHub", Modifier.weight(1f), quiet = true) { uri.openUri(REPO_URL) }
-        CapriButton("Support us", Modifier.weight(1f), quiet = true, color = GREEN) { uri.openUri(DONATE_URL) }
+        CapriButton(tr("Support us"), Modifier.weight(1f), quiet = true, color = GREEN) { uri.openUri(DONATE_URL) }
     }
     Text("v$version · ${Build.MODEL} · Android ${Build.VERSION.RELEASE}", color = MUTED, fontFamily = SANS, fontSize = 11.sp,
         modifier = Modifier.padding(start = 2.dp))

@@ -16,6 +16,7 @@ class CapriApp : Application() {
     override fun onCreate() {
         super.onCreate()
         CrashLog.install(this)
+        Lang.init(this)
     }
 }
 

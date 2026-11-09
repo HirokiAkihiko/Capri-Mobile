@@ -102,17 +102,17 @@ fun ChatTab(go: (Tab) -> Unit) {
         val n = list.layoutInfo.totalItemsCount
         if (n > 0) list.scrollToItem(n - 1)
     }
-    val online = running && "online" in status
+    val online = running && CapriService.brainOnline
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Eyes(talking = writing, annoyed = running && !online && status.startsWith("my brain stopped"))
+            Eyes(talking = writing, annoyed = running && !online && CapriService.brainState == "stopped")
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Capri", color = INK, fontFamily = SANS, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-                Text(if (running) status else "offline", color = MUTED, fontFamily = SANS, fontSize = 12.sp, maxLines = 1)
+                Text(if (running) status else tr("offline"), color = MUTED, fontFamily = SANS, fontSize = 12.sp, maxLines = 1)
             }
-            if (msgs.isNotEmpty()) Text("Clear", color = PINK, fontFamily = SANS, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+            if (msgs.isNotEmpty()) Text(tr("Clear"), color = PINK, fontFamily = SANS, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
                 modifier = Modifier.clickable { prefs.chat = "[]"; CapriService.chatLine = ""; pending = "" }.padding(8.dp))
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(EDGE))
@@ -120,9 +120,9 @@ fun ChatTab(go: (Tab) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (msgs.isEmpty() && pending.isEmpty()) item {
                 Column(Modifier.fillMaxWidth().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Say something, choom.", color = INK, fontFamily = SANS, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                    Text(tr("Say something, choom."), color = INK, fontFamily = SANS, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
                     Spacer(Modifier.height(6.dp))
-                    Text("Tell her about your day. She remembers.", color = MUTED, fontFamily = SANS, fontSize = 13.sp)
+                    Text(tr("Tell her about your day. She remembers."), color = MUTED, fontFamily = SANS, fontSize = 13.sp)
                 }
             }
             items(msgs) { (u, a) ->
@@ -135,14 +135,14 @@ fun ChatTab(go: (Tab) -> Unit) {
             if (pending.isNotEmpty() || writing) item { if (writing) Her(live) else Thinking(live == "*looking*") }
         }
         when {
-            !running -> Banner("She's offline.", if (Settings.canDrawOverlays(ctx)) "Summon" else "Go to Home") {
+            !running -> Banner(tr("She's offline."), if (Settings.canDrawOverlays(ctx)) tr("Summon") else tr("Go to Home")) {
                 if (Settings.canDrawOverlays(ctx)) summon(ctx) else go(Tab.HOME)
             }
-            !online && status == "no brain" -> Banner("She has no brain yet.", "Pick one") { go(Tab.BRAIN) }
-            !online && "watcher" in status -> Banner("The Watcher doesn't talk.", "Her look") { go(Tab.SETUP) }
-            !online -> Banner(status, "Brain") { go(Tab.BRAIN) }
+            !online && CapriService.brainState == "none" -> Banner(tr("She has no brain yet."), tr("Pick one")) { go(Tab.BRAIN) }
+            !online && CapriService.brainState == "watcher" -> Banner(tr("The Watcher doesn't talk."), tr("Her look")) { go(Tab.SETUP) }
+            !online -> Banner(status, tr("Brain")) { go(Tab.BRAIN) }
             else -> Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.Bottom) {
-                OutlinedTextField(text, { text = it }, placeholder = { Text("Say something...", color = MUTED) }, maxLines = 4,
+                OutlinedTextField(text, { text = it }, placeholder = { Text(tr("Say something..."), color = MUTED) }, maxLines = 4,
                     colors = capriField(), shape = chamfer(9.dp), modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(8.dp))
                 val send = text.isNotBlank()

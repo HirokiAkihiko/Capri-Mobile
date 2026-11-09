@@ -113,12 +113,12 @@ class LmStudio(url: String, private val key: String = "") {
         }.getOrDefault("").take(140)
         val cloud = key.isNotEmpty()
         val what = when {
-            code == 401 -> if (cloud) "NVIDIA says this key isn't valid. Copy the whole key again, or make a new one" else "the server wants a key"
-            code == 403 -> if (cloud) "NVIDIA said no: your account may need verifying (email or phone), or this key can't use that model" else "the server said no (403)"
-            code == 404 -> if (cloud) "that NVIDIA model isn't available right now" else "LM Studio has no model loaded"
-            code == 429 -> if (cloud) "NVIDIA is busy, or your free credits for today ran out. Try again in a bit" else "too many requests, wait a moment"
-            code >= 500 -> if (cloud) "NVIDIA's servers are having trouble ($code). Try again in a bit" else "LM Studio had an error ($code)"
-            else -> "the server said $code"
+            code == 401 -> if (cloud) tr("NVIDIA says this key isn't valid. Copy the whole key again, or make a new one") else tr("the server wants a key")
+            code == 403 -> if (cloud) tr("NVIDIA said no: your account may need verifying (email or phone), or this key can't use that model") else tr("the server said no (403)")
+            code == 404 -> if (cloud) tr("that NVIDIA model isn't available right now") else tr("LM Studio has no model loaded")
+            code == 429 -> if (cloud) tr("NVIDIA is busy, or your free credits for today ran out. Try again in a bit") else tr("too many requests, wait a moment")
+            code >= 500 -> if (cloud) tr("NVIDIA's servers are having trouble ({0}). Try again in a bit", code) else tr("LM Studio had an error ({0})", code)
+            else -> tr("the server said {0}", code)
         }
         return if (detail.isEmpty()) what else "$what ($detail)"
     }
@@ -134,7 +134,7 @@ class LmStudio(url: String, private val key: String = "") {
         try {
             c.outputStream.use { it.write(body.toString().toByteArray()) }
             val code = try { c.responseCode } catch (e: java.net.UnknownHostException) {
-                throw RuntimeException("no internet connection")
+                throw RuntimeException(tr("no internet connection"))
             }
             if (code !in 200..299) {
                 val body = c.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
@@ -192,10 +192,10 @@ class LmStudio(url: String, private val key: String = "") {
             client.switched = { used = it }
             return try {
                 client.chat(ModelStore.NV_MODEL, arrayOf("user"), arrayOf("Say hi in one word."), null, 16, 0.2f) { true }
-                true to (if (used == ModelStore.NV_MODEL) "Your key works. She's thinking with NVIDIA now."
-                else "Your key works. NVIDIA's biggest model is busy, so she's using ${used.substringAfter('/')} for now.")
+                true to (if (used == ModelStore.NV_MODEL) tr("Your key works. She's thinking with NVIDIA now.")
+                else tr("Your key works. NVIDIA's biggest model is busy, so she's using {0} for now.", used.substringAfter('/')))
             } catch (e: Exception) {
-                false to (e.message ?: "that didn't work")
+                false to (e.message ?: tr("that didn't work"))
             }
         }
 

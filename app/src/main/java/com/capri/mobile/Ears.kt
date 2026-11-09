@@ -90,6 +90,7 @@ class Ears(private val context: Context, private val heard: (String) -> Unit, pr
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        Lang.speech(context)?.let { i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, it) }  // the language you picked for her
         if (offline) i.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
         listening = true
         try {

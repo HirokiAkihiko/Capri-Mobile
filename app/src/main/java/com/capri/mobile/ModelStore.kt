@@ -117,8 +117,8 @@ object ModelStore {
         for (f in files) {
             val out = File(to, f.name)
             if (out.exists()) { f.delete(); continue }
-            if (to.usableSpace < f.length() + 200_000_000L) { progress("Not enough space to move ${f.name}. It stays in the app."); continue }
-            progress("Moving ${f.name}...")
+            if (to.usableSpace < f.length() + 200_000_000L) { progress(tr("Not enough space to move {0}. It stays in the app.", f.name)); continue }
+            progress(tr("Moving {0}...", f.name))
             val tmp = File(to, f.name + ".moving")
             try {
                 f.copyTo(tmp, overwrite = true)
@@ -126,7 +126,7 @@ object ModelStore {
                 f.delete()
             } catch (e: Exception) {
                 tmp.delete()
-                progress("Couldn't move ${f.name}: ${e.message}")
+                progress(tr("Couldn't move {0}: {1}", f.name, e.message))
                 return
             }
         }

@@ -112,6 +112,10 @@ class Prefs(context: Context) {
         get() = sp.getString("chat", "[]") ?: "[]"
         set(v) = sp.edit().putString("chat", v).apply()
 
+    var lang: String  // her language: "" = not picked yet (the first-launch picker shows), "auto" = the phone's, or a code (Lang)
+        get() = sp.getString("lang", "") ?: ""
+        set(v) = sp.edit().putString("lang", v).apply()
+
     var bubbleStyle: Int  // her chat bubble: 0 = classic (dark call box), 1 = light card, 2 = dark card
         get() = sp.getInt("bubble_style", 1)
         set(v) = sp.edit().putInt("bubble_style", v).apply()

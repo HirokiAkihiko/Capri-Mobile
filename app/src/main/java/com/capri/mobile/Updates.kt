@@ -86,14 +86,14 @@ object Updates {
 
     private fun notify(c: Context, tag: String) {
         val nm = c.getSystemService(NotificationManager::class.java) ?: return
-        if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel(CHANNEL, "New versions", NotificationManager.IMPORTANCE_DEFAULT))
+        if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel(CHANNEL, tr("New versions"), NotificationManager.IMPORTANCE_DEFAULT))
         val open = PendingIntent.getActivity(c, 10, Intent(Intent.ACTION_VIEW, Uri.parse(PAGE)),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         runCatching {
             nm.notify(8, NotificationCompat.Builder(c, CHANNEL)
                 .setSmallIcon(R.drawable.ic_capri_stat)
-                .setContentTitle("New Capri update")
-                .setContentText("Version ${tag.removePrefix("v")} is out. Tap to get it.")
+                .setContentTitle(tr("New Capri update"))
+                .setContentText(tr("Version {0} is out. Tap to get it.", tag.removePrefix("v")))
                 .setContentIntent(open)
                 .setAutoCancel(true)
                 .build())

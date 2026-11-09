@@ -18,13 +18,14 @@ class VoiceActivity : Activity() {
         if (savedInstanceState != null) return  // rotated mid-popup: the popup's result still comes back to us
         val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Talk to Capri")
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, tr("Talk to Capri"))
+            .apply { Lang.speech(this@VoiceActivity)?.let { putExtra(RecognizerIntent.EXTRA_LANGUAGE, it) } }
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         try {
             @Suppress("DEPRECATION")
             startActivityForResult(i, 1)
         } catch (e: ActivityNotFoundException) {
-            CapriService.instance?.voiceResult(null, "This phone has no voice typing at all. Type to me instead.")
+            CapriService.instance?.voiceResult(null, tr("This phone has no voice typing at all. Type to me instead."))
             finish()
         }
     }

@@ -57,10 +57,11 @@ Optional, in **Setup**: allow the mic to talk to her, and turn on Accessibility 
 - **Remembers your life.** Names, usernames, birthdays, what people like. She brings it up later, and sometimes trolls you with it. You can read and delete every memory.
 - **Reacts on her own.** Every minute or two she glances at the app you're in and drops one short line: your feed, the comments, your chats. She skips banking, wallet and password apps and login screens, and you can switch it off.
 - **Goes mini.** Her small form is just her eyes: drag them anywhere, tap to type, hold to talk. She goes mini by herself now and then, or turn on **Always mini** and she stays that way.
+- **Speaks your language.** English, Español, Português, Français, Русский, Italiano, Deutsch and Polski. Pick one the first time you open the app (or later in Setup): the app and her replies switch to it. Translations live in `app/src/main/assets/lang`, one file per language, so fixes are welcome.
 - **Keeps it short.** One quick line, like a text from a friend.
 - **Notices things.** Your charger, low battery, late nights, the app you open.
 - **Your look, your theme.** A clean light theme or a dark one, and a secret look to find.
-- **Gets out of the way.** Fullscreen videos and games: she steps away and comes back after.
+- **Gets out of the way.** Fullscreen videos and games: she shrinks to her eyes in the corner and comes back after. Over the keyboard or a text box she turns see-through and lets your taps through.
 
 <div align="center"><img src="docs/moves.gif" alt="Capri idling, talking, being thrown and sitting on an app icon" width="100%"></div>
 

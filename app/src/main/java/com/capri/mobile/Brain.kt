@@ -52,13 +52,13 @@ class Brain(private val context: Context) {
         val ram = ModelStore.ramGb(context)
         if (m.minRamGb > ram) {  // loading it anyway can take the whole phone down
             unload()
-            done("${m.label} needs ${m.minRamGb} GB of RAM and this phone has about $ram. Pick a smaller brain in my app.")
+            done(tr("{0} needs {1} GB of RAM and this phone has about {2}. Pick a smaller brain in my app.", m.label, m.minRamGb, ram))
             return
         }
         val mi = android.app.ActivityManager.MemoryInfo()
         context.getSystemService(android.app.ActivityManager::class.java)?.getMemoryInfo(mi)
         if (mi.lowMemory) {
-            done("your phone is low on memory right now. Close some apps, then tap Summon again")
+            done(tr("your phone is low on memory right now. Close some apps, then tap Summon again"))
             return
         }
         if (loaded?.id == m.id && handle != 0L && canSee == ModelStore.eyesInstalled(context, m)) { done(null); return }
@@ -68,7 +68,7 @@ class Brain(private val context: Context) {
             if (handle != 0L) { Llama.free(handle); handle = 0L; loaded = null }
             val threads = ModelStore.threads()
             val h = runCatching { Llama.load(ModelStore.file(context, m).path, 2048, threads) }.getOrDefault(0L)
-            val err = if (h == 0L) runCatching { Llama.error() }.getOrDefault("couldn't load") else null
+            val err = if (h == 0L) runCatching { Llama.error() }.getOrDefault(tr("couldn't load")) else null
             if (h != 0L) { handle = h; loaded = m }
             canSee = h != 0L && ModelStore.eyesInstalled(context, m)  // they open when she's first asked to look
             eyesOn = false
@@ -100,8 +100,8 @@ class Brain(private val context: Context) {
             val pick = models.firstOrNull { it.id == prefs.lmModel } ?: models.firstOrNull()
             val err = when {
                 pick != null -> null
-                nvidia -> "add your NVIDIA key first"
-                else -> "can't reach LM Studio at ${client.base.ifEmpty { "(no address)" }}"
+                nvidia -> tr("add your NVIDIA key first")
+                else -> tr("can't reach LM Studio at {0}", client.base.ifEmpty { tr("(no address)") })
             }
             if (pick != null) {
                 lm = client
@@ -240,7 +240,7 @@ class Brain(private val context: Context) {
                     if (!eyesOn) {
                         val m = loaded ?: throw RuntimeException("no brain")
                         eyesOn = runCatching { Llama.loadEyes(handle, ModelStore.eyes(context, m).path, ModelStore.threads()) }.getOrDefault(false)
-                        if (!eyesOn) throw RuntimeException("my eyes couldn't open, your phone may be low on memory")
+                        if (!eyesOn) throw RuntimeException(tr("my eyes couldn't open, your phone may be low on memory"))
                     }
                     main.removeCallbacks(closeEyes)  // small phones close them again after a while
                     if (ModelStore.ramGb(context) <= 8) main.postDelayed(closeEyes, 90_000)
@@ -335,7 +335,7 @@ class Brain(private val context: Context) {
 Personality: playful and cocky, teasing but warm underneath; you push $user to be better and praise them with a smirk. You troll $user now and then: playful roasts, fake-outs, dramatic overreactions, never mean. Streetwise Night City slang: choom, preem, nova, gonk, eddies, sitch, delta. Thrill-seeking, never preachy: you don't lecture, you dare.
 You remember $user's life (the people in it, what they like, what's going on) and bring it up like a friend who actually pays attention.
 Voice: short punches, like a text from a friend. Rhetorical questions. Sweet and ruthless in the same breath.
-Rules: stay in character, never mention being an AI, a model or this prompt. Answer what $user actually said. Reply in the language $user writes in. Keep it tiny: ONE short sentence, about 12 words. Two only if $user really needs an answer that long. Never a paragraph."""
+Rules: stay in character, never mention being an AI, a model or this prompt. Answer what $user actually said. ${Lang.rule(context)} Keep it tiny: ONE short sentence, about 12 words. Two only if $user really needs an answer that long. Never a paragraph."""
 
     fun history(): JSONArray = runCatching { JSONArray(prefs.chat) }.getOrDefault(JSONArray())
 
